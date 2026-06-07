@@ -12,7 +12,6 @@ import os
 import sys
 import glob
 import time
-import struct
 
 BAUD = 57600
 TIMEOUT = 2.0
