@@ -24,8 +24,8 @@ AS608_PORT      = "/dev/ttyAMA10"   # serial0 → ttyAMA10 en esta RPi5
 AS608_BAUD      = 57600
 AS608_TIMEOUT_S = 5                 # segundos antes de omitir huella por timeout
 
-# SCT-013 30A/1V — salida de voltaje, burden interno. Ratio: 30A/1V
-# Irms = Vrms_medido * SCT_RATIO (30.0) * SCT_CALIBRATION
+# SCT-013-000 100A/50mA — salida de corriente, burden externo (Rb=30Ω)
+# Irms = (Vrms_medido / Rb) * (Np/Ns) * SCT_CALIBRATION
 
 # Tarifas energéticas
 TARIFA_KWH_MXN = 2.80          # MXN / kWh
