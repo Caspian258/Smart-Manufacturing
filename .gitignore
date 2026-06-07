@@ -3,3 +3,4 @@ influxdb/
 CLAUDE.md
 agentes/
 influxdb/
+dashboard/grafana/grafana_datasource.yaml
