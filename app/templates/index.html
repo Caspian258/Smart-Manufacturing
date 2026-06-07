@@ -1,0 +1,2243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UNIX&Co. — Smart Manufacturing</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent:        #0F6E56;
+    --accent-dark:   #085041;
+    --accent-light:  #E1F5EE;
+    --accent-mid:    #1D9E75;
+    --accent-text:   #9FE1CB;
+    --bg:            #F4F4F2;
+    --surface:       #FFFFFF;
+    --border:        rgba(0,0,0,0.09);
+    --border-md:     rgba(0,0,0,0.13);
+    --text-primary:  #1a1a1a;
+    --text-secondary:#6b6b6b;
+    --text-hint:     #9a9a9a;
+    --radius-md:     8px;
+    --radius-lg:     12px;
+    --success-bg:    #EAF3DE;
+    --success-text:  #3B6D11;
+    --warning-bg:    #FAEEDA;
+    --warning-text:  #854F0B;
+    --danger-bg:     #FCEBEB;
+    --danger-text:   #A32D2D;
+    --info-bg:       #E6F1FB;
+    --info-text:     #185FA5;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); z-index: 100;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-lg);
+    padding: 2rem 2.5rem;
+    width: 340px;
+  }
+  .login-logo {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .login-logo-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-logo-icon i { font-size: 20px; color: var(--accent-text); }
+  .login-logo span { font-size: 18px; font-weight: 500; }
+  .login-subtitle { font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem; }
+  .login-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+  .login-input {
+    width: 100%; padding: 8px 12px;
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    font-size: 14px; outline: none;
+    background: var(--surface); color: var(--text-primary);
+    margin-bottom: 12px;
+    transition: border-color .15s;
+  }
+  .login-input:focus { border-color: var(--accent); }
+  .login-btn {
+    width: 100%; padding: 9px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-md);
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    transition: background .15s;
+  }
+  .login-btn:hover { background: var(--accent-dark); }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-error {
+    font-size: 12px; color: var(--danger-text);
+    background: var(--danger-bg);
+    border-radius: var(--radius-md);
+    padding: 6px 10px; margin-top: 10px;
+    display: none;
+  }
+
+  /* ── APP SHELL ── */
+  #app { display: none; height: 100vh; flex-direction: column; }
+  #app.visible { display: flex; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    height: 44px; min-height: 44px;
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 8px;
+  }
+  .topbar-title { font-size: 13px; font-weight: 500; margin-right: auto; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-success { background: var(--success-bg); color: var(--success-text); }
+  .badge-success .badge-dot { background: var(--success-text); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning-text); }
+  .badge-warning .badge-dot { background: var(--warning-text); }
+  .badge-danger  { background: var(--danger-bg);  color: var(--danger-text);  }
+  .badge-danger  .badge-dot  { background: var(--danger-text); }
+
+  /* ── MAIN LAYOUT ── */
+  .main-layout {
+    flex: 1; display: flex; overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 200px; min-width: 200px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-brand {
+    padding: 16px 14px 12px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .brand-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon i { font-size: 16px; color: var(--accent-text); }
+  .brand-name { font-size: 13px; font-weight: 500; }
+  .brand-sub { font-size: 11px; color: var(--text-secondary); }
+
+  .sidebar-section {
+    padding: 10px 8px 4px;
+  }
+  .sidebar-section-label {
+    font-size: 10px; color: var(--text-hint);
+    text-transform: uppercase; letter-spacing: .06em;
+    padding: 0 6px; margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: var(--radius-md);
+    cursor: pointer; font-size: 13px;
+    color: var(--text-secondary);
+    transition: background .12s, color .12s;
+    margin-bottom: 1px;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent); color: var(--accent-light);
+  }
+  .nav-item i { font-size: 15px; flex-shrink: 0; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 10px 12px;
+    border-top: 0.5px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--info-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 500; color: var(--info-text);
+    flex-shrink: 0;
+  }
+  .avatar-name { font-size: 12px; font-weight: 500; }
+  .avatar-role { font-size: 10px; color: var(--text-secondary); }
+
+  /* ── CONTENT ── */
+  .content {
+    flex: 1; overflow-y: auto;
+    padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  .content-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .content-title { font-size: 16px; font-weight: 500; }
+  .content-sub { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 500;
+    margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-hint { font-size: 11px; color: var(--text-hint); font-weight: 400; }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+  .kpi-label {
+    font-size: 11px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 4px;
+    margin-bottom: 6px;
+  }
+  .kpi-label i { font-size: 13px; }
+  .kpi-value {
+    font-size: 22px; font-weight: 500; color: var(--text-primary);
+  }
+  .kpi-unit { font-size: 13px; color: var(--text-secondary); font-weight: 400; }
+  .kpi-sub { font-size: 10px; margin-top: 4px; }
+  .kpi-sub.up   { color: var(--success-text); }
+  .kpi-sub.muted { color: var(--text-hint); }
+  .kpi-sub.accent { color: var(--accent); }
+  .kpi-restricted {
+    font-size: 13px; color: var(--text-hint);
+    margin-top: 6px;
+  }
+
+  /* ── TWO COL ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 10px;
+  }
+
+  /* ── STATUS LIST ── */
+  .status-list { display: flex; flex-direction: column; gap: 8px; }
+  .status-row {
+    display: flex; align-items: center;
+    justify-content: space-between;
+  }
+  .status-name { font-size: 12px; color: var(--text-secondary); }
+
+  /* ── RFID TABLE ── */
+  .rfid-row {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  .rfid-uid { display: flex; align-items: center; gap: 6px; color: var(--text-primary); }
+  .rfid-uid i { font-size: 14px; color: var(--text-hint); }
+  .rfid-time { color: var(--text-hint); }
+
+  /* ── CYCLE BANNER ── */
+  .cycle-banner {
+    padding: 11px 16px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cycle-banner-on {
+    background: #E8F5F0;
+    border: 1px solid #1D9E75;
+    color: #0F6E56;
+  }
+  .cycle-banner-off {
+    background: var(--bg);
+    border: 0.5px solid var(--border-md);
+    color: var(--text-hint);
+  }
+  @media (max-height: 650px) {
+    .cycle-banner { padding: 8px 12px; font-size: 12px; }
+  }
+
+  /* ── BTN ── */
+  .btn-ghost {
+    padding: 4px 10px; font-size: 12px;
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    background: none; cursor: pointer;
+    color: var(--text-secondary);
+    transition: background .12s;
+  }
+  .btn-ghost:hover { background: var(--bg); }
+
+  /* ── CHART WRAPPER ── */
+  .chart-wrap { position: relative; height: 120px; }
+
+  /* ── ADDITIONS: view-specific styles ── */
+  .chart-wrap-lg { position: relative; height: 200px; }
+
+  .view-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .view-table th {
+    text-align: left; padding: 8px 12px;
+    font-size: 11px; font-weight: 500; color: var(--text-hint);
+    border-bottom: 0.5px solid var(--border-md);
+  }
+  .view-table td {
+    padding: 8px 12px;
+    border-bottom: 0.5px solid var(--border);
+    vertical-align: middle;
+  }
+  .view-table tbody tr:last-child td { border-bottom: none; }
+  .view-table tbody tr:nth-child(even) td { background: var(--bg); }
+  .view-table tbody tr:nth-child(odd)  td { background: var(--surface); }
+
+  .signal-row {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 9px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .signal-row:last-child { border-bottom: none; }
+  .signal-name { font-size: 12px; color: var(--text-secondary); }
+
+  .no-data-card {
+    background: var(--warning-bg);
+    border: 0.5px solid var(--warning-text);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: 12px; color: var(--warning-text);
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .no-data-card i { flex-shrink: 0; margin-top: 1px; }
+
+  .btn-accent {
+    padding: 6px 14px; font-size: 12px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-md);
+    cursor: pointer; font-weight: 500;
+    transition: background .15s;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn-accent:hover { background: var(--accent-dark); }
+
+  /* ── RFID Filter row ── */
+  .rfid-filter-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 0 4px;
+  }
+  .rfid-filter-row .btn-filter {
+    padding: 3px 10px; font-size: 11px;
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    background: none; cursor: pointer;
+    color: var(--text-secondary);
+    transition: background .12s, color .12s;
+  }
+  .rfid-filter-row .btn-filter.active {
+    background: var(--accent); color: #fff;
+    border-color: var(--accent);
+  }
+  /* ── Modal overlay ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border-radius: 12px;
+    padding: 24px; min-width: 360px; max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    position: relative;
+  }
+  .modal-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-primary); }
+  .modal-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid var(--border); }
+  .modal-row:last-child { border-bottom: none; }
+  .modal-label { font-size: 11px; color: var(--text-hint); }
+  .modal-value { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+  .modal-vs { margin-top: 12px; padding: 10px; background: var(--bg); border-radius: 8px; }
+  .modal-vs-title { font-size: 11px; color: var(--text-hint); margin-bottom: 6px; font-weight: 600; }
+  .modal-vs-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+  .diff-up { color: var(--danger-text); }
+  .diff-down { color: var(--success-text); }
+  .modal-close-btn {
+    margin-top: 16px; width: 100%; padding: 8px;
+    background: var(--bg); border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); cursor: pointer;
+    font-size: 12px; color: var(--text-secondary);
+  }
+
+  .btn-del {
+    padding: 3px 8px; font-size: 11px;
+    background: var(--danger-bg); color: var(--danger-text);
+    border: 0.5px solid var(--danger-text);
+    border-radius: var(--radius-md); cursor: pointer;
+    transition: all .12s;
+  }
+  .btn-del:hover { background: var(--danger-text); color: #fff; }
+
+  .inline-form {
+    background: var(--bg);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    padding: 12px 14px; margin-top: 10px;
+    display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+  }
+  .inline-form .f-field { display: flex; flex-direction: column; gap: 3px; }
+  .inline-form label { font-size: 11px; color: var(--text-secondary); }
+  .inline-form input, .inline-form select {
+    padding: 6px 10px;
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    font-size: 13px; outline: none;
+    background: var(--surface); color: var(--text-primary);
+  }
+  .inline-form input:focus, .inline-form select:focus { border-color: var(--accent); }
+
+  .pagination {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 12px; justify-content: center;
+  }
+  .page-info { font-size: 12px; color: var(--text-secondary); min-width: 140px; text-align: center; }
+
+  .filter-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .filter-bar select {
+    padding: 5px 10px;
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    font-size: 12px; outline: none;
+    background: var(--surface); color: var(--text-primary);
+  }
+  .filter-bar select:focus { border-color: var(--accent); }
+
+  .mono { font-family: 'Menlo','Consolas',monospace; font-size: 11px; color: var(--accent); }
+
+  /* ── RESPONSIVE: pantallas ≤ 1100px de ancho ── */
+  @media (max-width: 1100px) {
+    .sidebar { width: 180px; min-width: 180px; }
+  }
+
+  /* ── RESPONSIVE: pantallas ≤ 650px de alto (cubre LCD 7" 1024×600) ── */
+  @media (max-height: 650px) {
+    .topbar { height: 40px; min-height: 40px; }
+    .content { padding: 10px 16px; gap: 10px; }
+    .kpi-value { font-size: 19px; }
+    .kpi-card { padding: 10px 12px; }
+    .kpi-label { margin-bottom: 3px; }
+    .card { padding: 10px 12px; }
+    .card-title { margin-bottom: 8px; }
+    .chart-wrap { height: 95px; }
+    .chart-wrap-lg { height: 150px; }
+    .sidebar-brand { padding: 12px 12px 8px; }
+    .nav-item { padding: 6px 8px; }
+    .sidebar-footer { padding: 8px 12px; }
+  }
+
+  /* ── RESPONSIVE: pantallas ≤ 500px de alto (cubre LCD 7" 480px) ── */
+  @media (max-height: 500px) {
+    body { font-size: 12px; }
+
+    .topbar { height: 36px; min-height: 36px; padding: 0 10px; gap: 6px; }
+    .topbar-title { font-size: 12px; }
+    .badge { font-size: 10px; padding: 2px 6px; }
+
+    .sidebar { width: 160px; min-width: 160px; }
+    .sidebar-brand { padding: 8px 10px 6px; }
+    .brand-name { font-size: 12px; }
+    .brand-sub { display: none; }
+    .brand-icon { width: 24px; height: 24px; border-radius: 5px; }
+    .brand-icon i { font-size: 13px; }
+
+    .sidebar-section { padding: 6px 6px 2px; }
+    .sidebar-section-label { font-size: 9px; padding: 0 4px; margin-bottom: 2px; }
+    .nav-item { padding: 5px 6px; font-size: 11px; gap: 6px; margin-bottom: 0; }
+    .nav-item i { font-size: 13px; }
+
+    .sidebar-footer { padding: 6px 10px; gap: 6px; }
+    .avatar { width: 24px; height: 24px; font-size: 10px; }
+    .avatar-name { font-size: 11px; }
+    .avatar-role { display: none; }
+
+    .content { padding: 8px 12px; gap: 8px; }
+    .content-title { font-size: 14px; }
+    .content-sub { font-size: 11px; }
+    .content-header { margin-bottom: 0; }
+
+    .card { padding: 8px 10px; }
+    .card-title { font-size: 11px; margin-bottom: 6px; }
+
+    .kpi-card { padding: 8px 10px; }
+    .kpi-label { font-size: 10px; margin-bottom: 3px; }
+    .kpi-label i { font-size: 11px; }
+    .kpi-value { font-size: 16px; }
+    .kpi-unit { font-size: 11px; }
+    .kpi-sub { font-size: 9px; margin-top: 2px; }
+
+    .chart-wrap { height: 75px; }
+    .chart-wrap-lg { height: 120px; }
+
+    .login-card { padding: 1.2rem 1.5rem; width: 300px; }
+    .login-logo span { font-size: 16px; }
+    .login-logo-icon { width: 30px; height: 30px; }
+    .login-logo-icon i { font-size: 16px; }
+
+    .rfid-row { padding: 5px 8px; font-size: 11px; }
+    .status-row { padding: 3px 0; }
+    .status-name { font-size: 11px; }
+
+    .view-table th { padding: 5px 8px; font-size: 10px; }
+    .view-table td { padding: 5px 8px; }
+    .filter-bar { margin-bottom: 6px; gap: 5px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon"><i class="ti ti-bolt"></i></div>
+      <span>UNIX&amp;Co.</span>
+    </div>
+    <p class="login-subtitle">CIMA + Celda 3105 — Smart Manufacturing</p>
+    <label class="login-label">Usuario</label>
+    <input class="login-input" type="text" id="login-user" placeholder="usuario" autocomplete="off"/>
+    <label class="login-label">PIN</label>
+    <input class="login-input" type="password" id="login-pin" placeholder="••••••" maxlength="6"
+           onkeydown="if(event.key==='Enter') doLogin()"/>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Ingresar</button>
+    <div class="login-error" id="login-error">Usuario o PIN incorrecto</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="topbar-title">UNIX&amp;Co.</span>
+    <span class="badge badge-warning" id="badge-mqtt"><span class="badge-dot"></span>MQTT</span>
+    <span class="badge badge-warning" id="badge-influx"><span class="badge-dot"></span>InfluxDB</span>
+    <span class="badge badge-warning" id="badge-n8n"><span class="badge-dot"></span>n8n</span>
+    <span class="badge badge-warning" id="badge-grafana"><span class="badge-dot"></span>Grafana :3001</span>
+    <span class="badge badge-success" id="badge-esp32"><span class="badge-dot"></span>ESP32 REAL</span>
+  </div>
+
+  <div class="main-layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-row">
+          <div class="brand-icon"><i class="ti ti-bolt"></i></div>
+          <span class="brand-name">UNIX&amp;Co.</span>
+        </div>
+        <span class="brand-sub">CIMA + Celda 3105</span>
+      </div>
+
+      <div class="sidebar-section" id="nav-planta1">
+        <p class="sidebar-section-label">Planta 1</p>
+        <button class="nav-item" onclick="showView('dashboard', this)">
+          <i class="ti ti-chart-bar"></i> Dashboard
+        </button>
+        <button class="nav-item" onclick="showView('energia', this)">
+          <i class="ti ti-bolt"></i> Energía
+        </button>
+        <button class="nav-item" onclick="showView('rfid', this)">
+          <i class="ti ti-scan"></i> RFID
+        </button>
+      </div>
+
+      <div class="sidebar-section" id="nav-planta2">
+        <p class="sidebar-section-label">Planta 2</p>
+        <button class="nav-item" onclick="showView('celda', this)">
+          <i class="ti ti-robot"></i> Celda 3105
+        </button>
+        <button class="nav-item" onclick="showView('quality', this)">
+          <i class="ti ti-eye"></i> Quality Gate
+        </button>
+      </div>
+
+      <div class="sidebar-section" id="nav-admin" style="display:none;">
+        <p class="sidebar-section-label">Admin</p>
+        <button class="nav-item" onclick="showView('costos', this)">
+          <i class="ti ti-currency-peso"></i> Costos MXN
+        </button>
+        <button class="nav-item" onclick="showView('usuarios', this)">
+          <i class="ti ti-users"></i> Usuarios
+        </button>
+        <button class="nav-item" onclick="showView('auditoria', this)">
+          <i class="ti ti-list"></i> Auditoría
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="avatar" id="user-avatar">AD</div>
+        <div>
+          <p class="avatar-name" id="user-name">Admin</p>
+          <p class="avatar-role" id="user-role">Acceso total</p>
+        </div>
+      </div>
+    </nav>
+
+    <!-- CONTENT -->
+    <main class="content" id="main-content">
+
+      <!-- ── DASHBOARD VIEW ── -->
+      <div id="view-dashboard">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Dashboard — Planta 1 CIMA</p>
+            <p class="content-sub">Torno · en vivo</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-success" id="badge-esp32-dash"><span class="badge-dot"></span>ESP32 online</span>
+            <button class="btn-ghost"><i class="ti ti-bell"></i></button>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-bolt"></i>Potencia</div>
+            <div class="kpi-value"><span id="kpi-power">0</span> <span class="kpi-unit">W</span></div>
+            <div class="kpi-sub up" id="kpi-power-sub">cargando...</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-current-ac"></i>Corriente</div>
+            <div class="kpi-value"><span id="kpi-irms">0.00</span> <span class="kpi-unit">A</span></div>
+            <div class="kpi-sub muted">SCT-013 real</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-clock"></i>Energía hoy</div>
+            <div class="kpi-value"><span id="kpi-energy">—</span> <span class="kpi-unit">kWh</span></div>
+            <div class="kpi-sub muted">últimas 24h</div>
+          </div>
+          <div class="kpi-card" id="kpi-cost-card">
+            <div class="kpi-label"><i class="ti ti-currency-peso"></i>Costo hoy</div>
+            <div class="kpi-value"><span id="kpi-cost">—</span> <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-sub accent">tarifa CFE</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">
+              Potencia en tiempo real
+              <span class="card-hint">últimos 5 min</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="powerChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Estado del sistema</div>
+            <div class="status-list">
+              <div class="status-row">
+                <span class="status-name">MQTT</span>
+                <span class="badge badge-warning" id="st-mqtt"><span class="badge-dot"></span>—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">InfluxDB</span>
+                <span class="badge badge-warning" id="st-influx"><span class="badge-dot"></span>—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">n8n</span>
+                <span class="badge badge-warning" id="st-n8n"><span class="badge-dot"></span>—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">Grafana</span>
+                <span class="badge badge-warning" id="st-grafana"><span class="badge-dot"></span>:3001</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">ESP32-S3</span>
+                <span class="badge badge-success" id="st-esp32"><span class="badge-dot"></span>REAL</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            Últimas piezas RFID
+            <button class="btn-ghost" onclick="showView('rfid', document.querySelector('[onclick*=\"rfid\"]'))">Ver historial</button>
+          </div>
+          <div id="rfid-mini-list">
+            <div class="rfid-row">
+              <div class="rfid-uid"><i class="ti ti-scan"></i><span>cargando...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ENERGÍA VIEW ── -->
+      <div id="view-energia" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Energía — Planta 1 CIMA</p>
+            <p class="content-sub">Torno · histórico 24h</p>
+          </div>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-clock"></i>Total kWh hoy</div>
+            <div class="kpi-value"><span id="e-kwh">—</span> <span class="kpi-unit">kWh</span></div>
+            <div class="kpi-sub muted">últimas 24h</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-bolt"></i>Pico de potencia</div>
+            <div class="kpi-value"><span id="e-pico">—</span> <span class="kpi-unit">W</span></div>
+            <div class="kpi-sub muted">máximo del día</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-chart-line"></i>Promedio</div>
+            <div class="kpi-value"><span id="e-avg">—</span> <span class="kpi-unit">W</span></div>
+            <div class="kpi-sub muted">potencia media</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            Potencia — últimas 24 horas
+            <span class="card-hint" id="e-updated">—</span>
+          </div>
+          <div class="chart-wrap-lg">
+            <canvas id="energyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RFID VIEW ── -->
+      <div id="view-rfid" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Trazabilidad RFID</p>
+            <p class="content-sub">Pasaporte digital de piezas</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn-accent" id="btn-export-pdf" onclick="exportRFIDPdf(this)">
+              <i class="ti ti-file-type-pdf"></i>Exportar PDF
+            </button>
+            <span class="badge badge-success"><span class="badge-dot"></span>auto-refresh 10s</span>
+          </div>
+        </div>
+
+        <!-- Banner ciclo activo -->
+        <div id="cycle-banner-active" class="cycle-banner cycle-banner-on" style="display:none;">
+          <span>🟢 CICLO ACTIVO</span>
+          <span>—</span>
+          <span class="mono" id="cycle-part-id" style="font-size:11px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+          <span style="margin-left:auto">⏱ <span id="cycle-timer">00:00</span></span>
+        </div>
+        <div id="cycle-banner-inactive" class="cycle-banner cycle-banner-off">
+          ⚪ Sin ciclo activo — Acerque tarjeta RFID para iniciar
+        </div>
+
+        <!-- Stats -->
+        <div class="kpi-grid" id="rfid-stats-row" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-package"></i>Piezas completadas</div>
+            <div class="kpi-value"><span id="r-total">—</span></div>
+            <div class="kpi-sub muted">historial</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-clock"></i>Tiempo promedio</div>
+            <div class="kpi-value" style="font-size:18px"><span id="r-avg-dur">—</span></div>
+            <div class="kpi-sub muted">mm:ss por pieza</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-bolt"></i>Energía promedio</div>
+            <div class="kpi-value" style="font-size:18px"><span id="r-avg-ewh">—</span> <span class="kpi-unit">Wh</span></div>
+            <div class="kpi-sub muted">por ciclo</div>
+          </div>
+          <div class="kpi-card" id="rfid-cost-stat" style="display:none;">
+            <div class="kpi-label"><i class="ti ti-currency-peso"></i>Costo total</div>
+            <div class="kpi-value" style="font-size:18px">$<span id="r-total-cost">—</span> <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-sub muted">energía del turno</div>
+          </div>
+        </div>
+
+        <!-- Tabla historial -->
+        <div class="card">
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span>Historial por pieza</span>
+            <div class="rfid-filter-row" style="padding:0;">
+              <button class="btn-filter active" id="btn-f-today" onclick="setRfidFilter('today',this)">Hoy</button>
+              <button class="btn-filter" id="btn-f-week"  onclick="setRfidFilter('week',this)">Esta semana</button>
+              <button class="btn-filter" id="btn-f-month" onclick="setRfidFilter('month',this)">Este mes</button>
+              <button class="btn-ghost" id="btn-export-csv" onclick="exportRfidCsv(this)" style="margin-left:4px;">
+                <i class="ti ti-file-spreadsheet"></i> CSV
+              </button>
+            </div>
+          </div>
+          <table class="view-table">
+            <thead>
+              <tr>
+                <th>Part ID</th>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th>Duración</th>
+                <th>Energía (Wh)</th>
+                <th id="col-cost-hdr" style="display:none">Costo (MXN)</th>
+              </tr>
+            </thead>
+            <tbody id="rfid-cycles-body">
+              <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Modal detalle pieza -->
+        <div id="rfid-detail-modal" class="modal-overlay" onclick="if(event.target===this)closeRfidModal()">
+          <div class="modal-box">
+            <div class="modal-title">Detalle de pieza — <span id="md-part-id">—</span></div>
+            <div class="modal-row"><span class="modal-label">Máquina</span><span class="modal-value" id="md-machine">—</span></div>
+            <div class="modal-row"><span class="modal-label">UID tarjeta</span><span class="modal-value mono" id="md-uid" style="font-size:10px">—</span></div>
+            <div class="modal-row"><span class="modal-label">Inicio</span><span class="modal-value" id="md-start">—</span></div>
+            <div class="modal-row"><span class="modal-label">Fin</span><span class="modal-value" id="md-end">—</span></div>
+            <div class="modal-row"><span class="modal-label">Duración</span><span class="modal-value" id="md-dur">—</span></div>
+            <div class="modal-row"><span class="modal-label">Energía</span><span class="modal-value" id="md-energy">—</span></div>
+            <div class="modal-row" id="md-cost-row" style="display:none"><span class="modal-label">Costo</span><span class="modal-value" id="md-cost">—</span></div>
+            <div class="modal-vs">
+              <div class="modal-vs-title">vs. Promedio del turno (últimas 8h)</div>
+              <div class="modal-vs-row"><span>Duración</span><span id="md-vs-dur" class="modal-value">—</span></div>
+              <div class="modal-vs-row"><span>Energía</span><span id="md-vs-energy" class="modal-value">—</span></div>
+            </div>
+            <button class="modal-close-btn" onclick="closeRfidModal()">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CELDA 3105 VIEW ── -->
+      <div id="view-celda" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Celda 3105 — Planta 2</p>
+            <p class="content-sub">Greenfield · PLC S7-1200</p>
+          </div>
+          <span id="celda-status-badge" class="badge badge-warning"><span class="badge-dot"></span>Sin conexión</span>
+        </div>
+
+        <!-- Banner sin conexión -->
+        <div id="celda-banner-offline" class="cycle-banner" style="background:var(--warning-bg);color:var(--warning-text);border:0.5px solid var(--warning-text);display:none;">
+          ⚠️ Sin conexión con PLC — conectar a red del Tec
+        </div>
+
+        <!-- Banner emergencia -->
+        <div id="celda-banner-emergencia" class="cycle-banner" style="background:#fff0f0;color:#a32d2d;border:0.5px solid #a32d2d;font-weight:600;display:none;">
+          🚨 EMERGENCIA ACTIVA — KILLSWITCH PRESIONADO
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-cpu"></i>Estado PLC</div>
+            <div class="kpi-value" style="font-size:14px;margin-top:4px;">
+              <span id="celda-estado-badge" class="badge badge-warning"><span class="badge-dot"></span><span id="celda-estado">—</span></span>
+            </div>
+            <div class="kpi-sub muted">modo operación</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-package"></i>Piezas procesadas</div>
+            <div class="kpi-value"><span id="celda-piezas">—</span> <span class="kpi-unit">uds</span></div>
+            <div class="kpi-sub muted">turno actual</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-clock"></i>Tiempo de ciclo</div>
+            <div class="kpi-value"><span id="celda-ciclo">—</span> <span class="kpi-unit">s</span></div>
+            <div class="kpi-sub muted">promedio</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-chart-pie"></i>OEE</div>
+            <div class="kpi-value"><span id="celda-oee">—</span> <span class="kpi-unit">%</span></div>
+            <div class="kpi-sub muted">eficiencia global</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- Señales PLC -->
+          <div class="card">
+            <div class="card-title">Señales PLC</div>
+            <div class="signal-row">
+              <span class="signal-name">Emergencia</span>
+              <span id="sig-emergencia" class="badge badge-warning"><span class="badge-dot"></span>—</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Modo automático</span>
+              <span id="sig-auto" class="badge badge-warning"><span class="badge-dot"></span>—</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Cobot activo</span>
+              <span id="sig-cobot" class="badge badge-warning"><span class="badge-dot"></span>—</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Cognex / Foto</span>
+              <span id="sig-cognex" class="badge badge-warning"><span class="badge-dot"></span>—</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-name">Botón Verde (confirmar)</span>
+              <span id="sig-boton-verde" class="badge badge-warning"><span class="badge-dot"></span>—</span>
+            </div>
+            <div class="signal-row" style="border-top:0.5px solid var(--border-md);margin-top:8px;padding-top:8px;">
+              <span class="signal-name" style="font-weight:600">Semáforo</span>
+              <span id="celda-semaforo" style="font-size:20px;letter-spacing:4px;">⚪⚪⚪</span>
+            </div>
+          </div>
+          <!-- Últimas operaciones -->
+          <div class="card">
+            <div class="card-title">Últimas operaciones <span class="card-hint">turno actual</span></div>
+            <table class="view-table">
+              <thead><tr><th>#</th><th>Duración</th><th>Resultado</th><th>Hora</th></tr></thead>
+              <tbody id="celda-ops-body">
+                <tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-hint)">Cargando…</td></tr>
+              </tbody>
+            </table>
+            <!-- Quality Gate summary -->
+            <div style="padding:12px 0 4px;border-top:0.5px solid var(--border);margin-top:8px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:11px;color:var(--text-hint)">Aprobadas</span>
+                <span id="q-aprobadas-num" style="font-size:11px;font-weight:600;color:var(--success-text)">—</span>
+              </div>
+              <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:8px;">
+                <div id="q-aprobadas-bar" style="height:100%;background:var(--success-text);border-radius:3px;width:0%;transition:width .4s"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:11px;color:var(--text-hint)">Rechazadas</span>
+                <span id="q-rechazadas-num" style="font-size:11px;font-weight:600;color:var(--danger-text)">—</span>
+              </div>
+              <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
+                <div id="q-rechazadas-bar" style="height:100%;background:var(--danger-text);border-radius:3px;width:0%;transition:width .4s"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── QUALITY GATE VIEW ── -->
+      <div id="view-quality" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Quality Gate — Celda 3105</p>
+            <p class="content-sub">Visión artificial Cognex</p>
+          </div>
+          <span id="quality-status-badge" class="badge badge-warning"><span class="badge-dot"></span>Sin datos reales</span>
+        </div>
+
+        <div id="quality-no-data" class="no-data-card" style="display:none;">
+          <i class="ti ti-alert-triangle"></i>
+          Sin datos de inspección — pipeline Cognex pendiente de configuración.
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-eye"></i>Inspeccionadas</div>
+            <div class="kpi-value"><span id="q-total">—</span> <span class="kpi-unit">uds</span></div>
+            <div class="kpi-sub muted">turno actual</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-circle-check"></i>Aprobadas</div>
+            <div class="kpi-value" style="color:var(--success-text)"><span id="q-aprobadas">—</span> <span class="kpi-unit">uds</span></div>
+            <div class="kpi-sub up">PASS</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-circle-x"></i>Rechazadas</div>
+            <div class="kpi-value" style="color:var(--danger-text)"><span id="q-rechazadas">—</span> <span class="kpi-unit">uds</span></div>
+            <div class="kpi-sub" style="color:var(--danger-text)">FAIL</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-chart-pie"></i>Rendimiento</div>
+            <div class="kpi-value"><span id="q-rendimiento">—</span> <span class="kpi-unit">%</span></div>
+            <div class="kpi-sub muted">calidad</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Aprobadas vs. Rechazadas <span class="card-hint">últimas 8h</span></div>
+            <div class="chart-wrap-lg">
+              <canvas id="qualityChart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Últimas inspecciones</div>
+            <table class="view-table">
+              <thead><tr><th>Part ID</th><th>Resultado</th><th>Hora</th></tr></thead>
+              <tbody>
+                <tr><td colspan="3" style="text-align:center;padding:16px;color:var(--text-hint)">Sin inspecciones</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── COSTOS MXN VIEW (admin) ── -->
+      <div id="view-costos" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Costos energéticos</p>
+            <p class="content-sub">Tarifa CFE · México</p>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-currency-peso"></i>Costo hoy</div>
+            <div class="kpi-value"><span id="c-dia">—</span> <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-sub muted">últimas 24h</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-calendar-month"></i>kWh este mes</div>
+            <div class="kpi-value"><span id="c-kwh-mes">—</span> <span class="kpi-unit">kWh</span></div>
+            <div class="kpi-sub muted">estimado 30 días</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-trending-up"></i>Proyección mensual</div>
+            <div class="kpi-value"><span id="c-proy">—</span> <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-sub muted">estimado 30 días</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><i class="ti ti-leaf"></i>Ahorro vs. baseline</div>
+            <div class="kpi-value"><span id="c-ahorro">—</span> <span class="kpi-unit">MXN</span></div>
+            <div class="kpi-sub accent">vs. sin optimización</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Desglose por máquina <span class="card-hint">últimas 24h</span></div>
+            <table class="view-table">
+              <thead>
+                <tr><th>Máquina</th><th>kWh</th><th>Costo MXN</th><th>% del total</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><i class="ti ti-tool" style="color:var(--accent);margin-right:4px"></i>Torno CNC</td>
+                  <td><span id="c-kwh-torno">—</span></td>
+                  <td><span id="c-mxn-torno">—</span></td>
+                  <td><span id="c-pct-torno">—</span>%</td>
+                </tr>
+                <tr>
+                  <td><i class="ti ti-tool" style="color:var(--text-hint);margin-right:4px"></i>Fresadora</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-title">Configuración tarifaria</div>
+            <div class="status-list">
+              <div class="status-row">
+                <span class="status-name">Tarifa CFE</span>
+                <span style="font-size:12px;font-weight:500" id="c-tarifa">—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">Factor de potencia</span>
+                <span style="font-size:12px;font-weight:500">0.85</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">ROI estimado</span>
+                <span style="font-size:12px;font-weight:500"><span id="c-roi">—</span>%</span>
+              </div>
+              <div class="status-row">
+                <span class="status-name">Ahorro anual proyect.</span>
+                <span style="font-size:12px;font-weight:500">$<span id="c-ahorro-anual">—</span> MXN</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USUARIOS VIEW (admin) ── -->
+      <div id="view-usuarios" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Gestión de usuarios</p>
+            <p class="content-sub">Control de acceso RBAC</p>
+          </div>
+          <button class="btn-accent" onclick="toggleAddForm()">
+            <i class="ti ti-user-plus"></i> Agregar usuario
+          </button>
+        </div>
+
+        <div class="card" id="add-user-form" style="display:none;">
+          <div class="card-title">Nuevo usuario</div>
+          <div class="inline-form">
+            <div class="f-field">
+              <label>Username</label>
+              <input type="text" id="new-username" placeholder="operador5" style="width:130px">
+            </div>
+            <div class="f-field">
+              <label>PIN (4-6 dígitos)</label>
+              <input type="password" id="new-pin" placeholder="••••••" maxlength="6" style="width:120px">
+            </div>
+            <div class="f-field">
+              <label>Rol</label>
+              <select id="new-rol">
+                <option value="planta1">planta1</option>
+                <option value="planta2">planta2</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+            <div class="f-field">
+              <label>&nbsp;</label>
+              <button class="btn-accent" onclick="submitAddUser()">Guardar</button>
+            </div>
+          </div>
+          <div id="add-user-msg" style="font-size:12px;margin-top:8px;padding-left:2px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Usuarios registrados</div>
+          <table class="view-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Rol</th>
+                <th>Creado</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-hint)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── AUDITORÍA VIEW (admin) ── -->
+      <div id="view-auditoria" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Log de auditoría</p>
+            <p class="content-sub">Registro de accesos y acciones</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            Registro de eventos
+            <span class="card-hint" id="audit-total-hint">—</span>
+          </div>
+          <div class="filter-bar">
+            <select id="audit-filter-user" onchange="auditPage=1;renderAudit()">
+              <option value="">Todos los usuarios</option>
+            </select>
+            <select id="audit-filter-action" onchange="auditPage=1;renderAudit()">
+              <option value="">Todas las acciones</option>
+              <option value="LOGIN">LOGIN</option>
+              <option value="ADD_USER">ADD_USER</option>
+            </select>
+          </div>
+          <table class="view-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>IP / Dispositivo</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-hint)">Cargando...</td></tr>
+            </tbody>
+          </table>
+          <div class="pagination">
+            <button class="btn-ghost" id="audit-prev" onclick="auditPrev()" disabled>← Anterior</button>
+            <span class="page-info" id="audit-page-info">—</span>
+            <button class="btn-ghost" id="audit-next" onclick="auditNext()">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ACCESS DENIED VIEW ── -->
+      <div id="view-denied" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Acceso denegado</p>
+            <p class="content-sub">No tienes permisos para ver esta sección</p>
+          </div>
+        </div>
+        <div class="no-data-card">
+          <i class="ti ti-lock"></i>
+          Tu rol no tiene acceso a esta sección. Contacta al administrador si crees que esto es un error.
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const powerData   = Array.from({length:60}, () => 0);
+const powerLabels = Array.from({length:60}, () => '');
+let powerChart   = null;
+let energyChart  = null;
+let qualChart    = null;
+let currentRole  = '';
+let currentView  = 'dashboard';
+const viewTimers = {};
+
+// RBAC: vistas permitidas por rol
+const ROLE_ALLOWED_VIEWS = {
+  admin:   new Set(['dashboard', 'energia', 'rfid', 'celda', 'quality', 'costos', 'usuarios', 'auditoria']),
+  planta1: new Set(['dashboard', 'energia', 'rfid']),
+  planta2: new Set(['celda', 'quality']),
+};
+
+// Audit state
+let auditAllLogs = [];
+let auditPage    = 1;
+const AUDIT_PER  = 20;
+
+// Delete confirm state
+let pendingDelete = null;
+
+// ── Active cycle tracking ─────────────────────────────────────────────────────
+let activeCycleStartMs = null;
+let cycleTimerInterval = null;
+
+async function pollActiveCycle() {
+  try {
+    const d = await window.pywebview.api.get_active_cycle();
+    const bannerOn  = document.getElementById('cycle-banner-active');
+    const bannerOff = document.getElementById('cycle-banner-inactive');
+    if (!bannerOn) return;
+    if (d && d.active) {
+      if (!activeCycleStartMs) {
+        activeCycleStartMs = Date.now() - (d.elapsed_s || 0) * 1000;
+        if (!cycleTimerInterval)
+          cycleTimerInterval = setInterval(updateCycleTimer, 1000);
+      }
+      bannerOn.style.display  = 'flex';
+      bannerOff.style.display = 'none';
+      const el = document.getElementById('cycle-part-id');
+      if (el) el.textContent = d.part_id || '—';
+    } else {
+      const wasActive = activeCycleStartMs !== null;
+      activeCycleStartMs = null;
+      if (cycleTimerInterval) { clearInterval(cycleTimerInterval); cycleTimerInterval = null; }
+      bannerOn.style.display  = 'none';
+      bannerOff.style.display = 'flex';
+      if (wasActive && currentView === 'rfid') loadRFIDCycles();
+    }
+  } catch(e) {}
+}
+
+function updateCycleTimer() {
+  if (!activeCycleStartMs) return;
+  const elapsed = Math.floor((Date.now() - activeCycleStartMs) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  const el = document.getElementById('cycle-timer');
+  if (el) el.textContent = `${mm}:${ss}`;
+}
+
+async function loadRFIDCycles() {
+  try {
+    const showCost = currentRole === 'admin';
+    const hdr = document.getElementById('col-cost-hdr');
+    if (hdr) hdr.style.display = showCost ? '' : 'none';
+    const costStat = document.getElementById('rfid-cost-stat');
+    const statsRow = document.getElementById('rfid-stats-row');
+    if (showCost && costStat) {
+      costStat.style.display = '';
+      if (statsRow) statsRow.style.gridTemplateColumns = 'repeat(4,minmax(0,1fr))';
+    }
+
+    const [cycles, stats] = await Promise.all([
+      window.pywebview.api.get_rfid_cycles(50, rfidCurrentFilter),
+      window.pywebview.api.get_rfid_stats(),
+    ]);
+
+    if (stats && !stats.error) {
+      setEl('r-total', stats.total || 0);
+      const avgS = stats.avg_duration_s || 0;
+      const mm   = String(Math.floor(avgS / 60)).padStart(2, '0');
+      const ss   = String(Math.round(avgS % 60)).padStart(2, '0');
+      setEl('r-avg-dur', `${mm}:${ss}`);
+      setEl('r-avg-ewh', (stats.avg_energy_wh || 0).toFixed(1));
+      if (stats.total_cost_mxn !== undefined)
+        setEl('r-total-cost', stats.total_cost_mxn.toFixed(2));
+    }
+
+    const tbody = document.getElementById('rfid-cycles-body');
+    if (!tbody) return;
+    if (!cycles || !cycles.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Sin piezas en el período seleccionado</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = cycles.map(r => {
+      const durS = r.duration_s || 0;
+      const mm2  = String(Math.floor(durS / 60)).padStart(2, '0');
+      const ss2  = String(durS % 60).padStart(2, '0');
+      const tS   = r.ts_start ? fmtDT(r.ts_start) : '—';
+      const tE   = r.ts_end   ? fmtDT(r.ts_end)   : '—';
+      const pid  = (r.part_id || '').replace(/'/g, "\\'");
+      const costCell = showCost
+        ? `<td style="font-size:11px">$${(r.cost_mxn||0).toFixed(4)}</td>`
+        : '';
+      return `<tr style="cursor:pointer" onclick="showRfidDetail('${pid}')" title="Ver detalle">
+        <td class="mono" style="font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent)" title="${r.part_id||''}">${r.part_id||'—'}</td>
+        <td style="font-size:11px;color:var(--text-hint)">${tS}</td>
+        <td style="font-size:11px;color:var(--text-hint)">${tE}</td>
+        <td style="font-weight:500">${mm2}:${ss2}</td>
+        <td>${(r.energy_wh||0).toFixed(2)}</td>
+        ${costCell}
+      </tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
+// ── pywebview handshake ───────────────────────────────────────────────────────
+window.addEventListener('pywebviewready', () => {
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setEl(id, v) {
+  const el = document.getElementById(id);
+  if (el && v !== undefined && v !== null) el.textContent = v;
+}
+
+function applyBadge(el, status) {
+  if (!el) return;
+  const cls = status === 'ok' ? 'badge-success' : status === 'warn' ? 'badge-warning' : 'badge-danger';
+  const old = ['badge-success','badge-warning','badge-danger'];
+  old.forEach(c => el.classList.remove(c));
+  el.classList.add(cls);
+}
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m    = Math.floor(diff / 60000);
+  if (m < 1)  return 'ahora';
+  if (m < 60) return `hace ${m} min`;
+  return `hace ${Math.floor(m / 60)}h`;
+}
+
+function fmtDT(iso) {
+  return new Date(iso).toLocaleString('es-MX', {
+    day:'2-digit', month:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit',
+  });
+}
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+}
+
+// Sample array to maxPts for chart performance
+function sample(arr, maxPts) {
+  if (arr.length <= maxPts) return arr;
+  const step = Math.ceil(arr.length / maxPts);
+  return arr.filter((_, i) => i % step === 0);
+}
+
+// ── Dashboard chart ───────────────────────────────────────────────────────────
+function initDashChart() {
+  const ctx = document.getElementById('powerChart').getContext('2d');
+  powerChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: powerLabels,
+      datasets: [{
+        data: powerData,
+        borderColor: '#1D9E75', borderWidth: 1.5,
+        pointRadius: 0, fill: true,
+        backgroundColor: 'rgba(29,158,117,0.07)',
+        tension: 0.4,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color:'#aaa', font:{size:10} }, border:{display:false} },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color:'#aaa', font:{size:10}, callback: v => v+'W' }, border:{display:false}, min:0 },
+      },
+    },
+  });
+}
+
+function pushPower(value) {
+  powerData.shift();   powerData.push(value);
+  powerLabels.shift(); powerLabels.push('');
+  if (powerChart) powerChart.update('none');
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pin  = document.getElementById('login-pin').value.trim();
+  const err  = document.getElementById('login-error');
+  const btn  = document.getElementById('login-btn');
+  err.style.display = 'none';
+  if (!user || !pin) { err.textContent = 'Ingresa usuario y PIN'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  try {
+    const res = await window.pywebview.api.login(user, pin);
+    if (res && res.success) {
+      currentRole = res.role;
+      setEl('user-name',   res.username || user);
+      setEl('user-role',   res.role === 'admin' ? 'Acceso total' : res.role);
+      setEl('user-avatar', (res.username || user).slice(0,2).toUpperCase());
+
+      // Mostrar solo las secciones del sidebar permitidas por rol
+      const navP1 = document.getElementById('nav-planta1');
+      const navP2 = document.getElementById('nav-planta2');
+      const navAd = document.getElementById('nav-admin');
+      if (res.role === 'admin') {
+        navP1.style.display = 'block';
+        navP2.style.display = 'block';
+        navAd.style.display = 'block';
+      } else if (res.role === 'planta1') {
+        navP1.style.display = 'block';
+        navP2.style.display = 'none';
+        navAd.style.display = 'none';
+      } else if (res.role === 'planta2') {
+        navP1.style.display = 'none';
+        navP2.style.display = 'block';
+        navAd.style.display = 'none';
+      }
+
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').classList.add('visible');
+
+      // Navegar a la vista inicial correcta según rol
+      if (res.role === 'planta2') {
+        showView('celda', document.querySelector('#nav-planta2 .nav-item'));
+      } else {
+        initDashChart();
+        showView('dashboard', document.querySelector('#nav-planta1 .nav-item'));
+      }
+      startPolling();
+    } else {
+      err.textContent   = (res && res.message) ? res.message : 'Usuario o PIN incorrecto';
+      err.style.display = 'block';
+      document.getElementById('login-pin').value = '';
+      btn.disabled = false; btn.textContent = 'Ingresar';
+    }
+  } catch(e) {
+    err.textContent = 'Error de conexión con el backend';
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Ingresar';
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const VIEW_LOADERS = {
+  energia:   loadEnergia,
+  rfid:      loadRFID,
+  celda:     loadCelda,
+  quality:   loadQuality,
+  costos:    loadCostos,
+  usuarios:  loadUsuarios,
+  auditoria: loadAuditoria,
+};
+
+function showView(name, btn) {
+  // Validación RBAC — defensa en profundidad
+  const allowed = ROLE_ALLOWED_VIEWS[currentRole];
+  if (allowed && !allowed.has(name)) {
+    document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
+    const denied = document.getElementById('view-denied');
+    if (denied) denied.style.display = 'block';
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    return;
+  }
+
+  // Clear previous view timer
+  if (viewTimers[currentView]) {
+    clearInterval(viewTimers[currentView]);
+    delete viewTimers[currentView];
+  }
+  if (viewTimers.celdaFast) { clearInterval(viewTimers.celdaFast); delete viewTimers.celdaFast; }
+  if (viewTimers.celdaKpis) { clearInterval(viewTimers.celdaKpis); delete viewTimers.celdaKpis; }
+  currentView = name;
+
+  document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
+  const view = document.getElementById('view-' + name);
+  if (view) view.style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  if (VIEW_LOADERS[name]) VIEW_LOADERS[name]();
+}
+
+// ── Dashboard polling ─────────────────────────────────────────────────────────
+async function pollData() {
+  try {
+    const d = await window.pywebview.api.get_current_power();
+    if (!d || d.error) return;
+    const pw = Math.round(d.power_w || 0);
+    setEl('kpi-power', pw);
+    setEl('kpi-irms',  (d.irms_a || 0).toFixed(2));
+    setEl('kpi-power-sub', pw > 10 ? '↑ activo' : '— sin carga');
+    if (d.energy_kwh !== undefined) setEl('kpi-energy', d.energy_kwh.toFixed(3));
+    const esp32ok = (d.irms_a || 0) > 0.01;
+    ['badge-esp32','badge-esp32-dash','st-esp32'].forEach(id =>
+      applyBadge(document.getElementById(id), esp32ok ? 'ok' : 'warn'));
+    pushPower(pw);
+  } catch(e) {}
+
+  try {
+    if (currentRole === 'admin') {
+      const c = await window.pywebview.api.get_cost_data();
+      if (c && !c.error) setEl('kpi-cost', (c.costo_mxn || 0).toFixed(2));
+    }
+  } catch(e) {}
+}
+
+async function pollStatus() {
+  try {
+    const s = await window.pywebview.api.get_system_status();
+    if (!s) return;
+    const mapping = [
+      ['mosquitto', 'badge-mqtt',    'st-mqtt',    'MQTT'],
+      ['influxdb',  'badge-influx',  'st-influx',  'online'],
+      ['n8n',       'badge-n8n',     'st-n8n',     'online'],
+      ['grafana',   'badge-grafana', 'st-grafana',  ':3001'],
+    ];
+    mapping.forEach(([key, topId, dashId, label]) => {
+      const status = s[key] || 'down';
+      applyBadge(document.getElementById(topId), status);
+      const dashEl = document.getElementById(dashId);
+      if (dashEl) {
+        applyBadge(dashEl, status);
+        dashEl.innerHTML = `<span class="badge-dot"></span>${label}`;
+      }
+    });
+  } catch(e) {}
+}
+
+async function pollRfid() {
+  try {
+    const list = await window.pywebview.api.get_rfid_history(5);
+    if (!list || !list.length) return;
+    const container = document.getElementById('rfid-mini-list');
+    if (!container) return;
+    container.innerHTML = list.map(r => `
+      <div class="rfid-row">
+        <div class="rfid-uid"><i class="ti ti-scan"></i><span>${r.uid || '—'}</span></div>
+        <span class="rfid-time">${timeAgo(r.time)}</span>
+        <span class="badge badge-success"><span class="badge-dot"></span>leído</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function startPolling() {
+  pollData(); pollStatus(); pollRfid(); pollActiveCycle();
+  setInterval(pollData,        5000);
+  setInterval(pollStatus,      30000);
+  setInterval(pollRfid,        10000);
+  setInterval(pollActiveCycle, 5000);
+}
+
+// ── VIEW: Energía ─────────────────────────────────────────────────────────────
+async function loadEnergia() {
+  if (energyChart) { energyChart.destroy(); energyChart = null; }
+  try {
+    const raw = await window.pywebview.api.get_energy_24h();
+    if (!raw || !raw.length) {
+      setEl('e-kwh', '—'); setEl('e-pico', '—'); setEl('e-avg', '—');
+      setEl('e-updated', 'Sin datos');
+      return;
+    }
+
+    const powers   = raw.map(d => d.power_w || 0);
+    const totalKwh = raw.reduce((s, d) => s + (d.energy_kwh || 0), 0);
+    const pico     = Math.max(...powers);
+    const avg      = powers.reduce((a, b) => a + b, 0) / powers.length;
+
+    setEl('e-kwh',     totalKwh.toFixed(3));
+    setEl('e-pico',    Math.round(pico));
+    setEl('e-avg',     Math.round(avg));
+    setEl('e-updated', `${raw.length} pts · actualizado ${timeAgo(raw[raw.length-1].time)}`);
+
+    // Sample for chart performance (max 300 points)
+    const data   = sample(raw, 300);
+    const labels = data.map(d => fmtTime(d.time));
+    const vals   = data.map(d => d.power_w || 0);
+
+    const ctx = document.getElementById('energyChart');
+    if (!ctx) return;
+    energyChart = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: vals,
+          borderColor: '#1D9E75', borderWidth: 1.5,
+          pointRadius: 0, fill: true,
+          backgroundColor: 'rgba(29,158,117,0.07)',
+          tension: 0.4,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${Math.round(c.parsed.y)} W` } },
+        },
+        scales: {
+          x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10},maxTicksLimit:8}, border:{display:false} },
+          y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10},callback:v=>v+'W'}, border:{display:false}, min:0 },
+        },
+      },
+    });
+  } catch(e) {}
+}
+
+// ── VIEW: RFID / Trazabilidad ─────────────────────────────────────────────────
+let rfidCurrentFilter = 'today';
+
+async function loadRFID() {
+  await Promise.all([pollActiveCycle(), loadRFIDCycles()]);
+  viewTimers.rfid = setInterval(() => Promise.all([pollActiveCycle(), loadRFIDCycles()]), 10000);
+}
+
+async function setRfidFilter(key, btn) {
+  rfidCurrentFilter = key;
+  document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  await loadRFIDCycles();
+}
+
+async function exportRFIDPdf(btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i>Generando…';
+  try {
+    const r = await window.pywebview.api.export_rfid_pdf();
+    if (r && r.ok) {
+      btn.innerHTML = '<i class="ti ti-check"></i>PDF guardado';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 3000);
+    } else {
+      btn.innerHTML = '<i class="ti ti-x"></i>Error';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 2500);
+    }
+  } catch(e) {
+    btn.innerHTML = '<i class="ti ti-x"></i>Error';
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 2500);
+  }
+}
+
+async function exportRfidCsv(btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i>Generando…';
+  try {
+    const r = await window.pywebview.api.export_rfid_csv(rfidCurrentFilter);
+    if (r && r.ok) {
+      btn.innerHTML = '<i class="ti ti-check"></i>CSV guardado';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 3000);
+    } else {
+      btn.innerHTML = '<i class="ti ti-x"></i>Error';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 2500);
+    }
+  } catch(e) {
+    btn.innerHTML = '<i class="ti ti-x"></i>Error';
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 2500);
+  }
+}
+
+async function showRfidDetail(partId) {
+  try {
+    const d = await window.pywebview.api.get_rfid_pieza_detalle(partId);
+    if (!d || d.error || !d.detalle) return;
+    const det = d.detalle;
+    const pro = d.promedios || {};
+    const durS = det.duration_s || 0;
+    const mm = String(Math.floor(durS/60)).padStart(2,'0');
+    const ss = String(durS%60).padStart(2,'0');
+    setEl('md-part-id',  det.part_id || '—');
+    setEl('md-machine',  det.machine_id || '—');
+    setEl('md-uid',      det.uid || '—');
+    setEl('md-start',    det.ts_start ? fmtDT(det.ts_start) : '—');
+    setEl('md-end',      det.ts_end   ? fmtDT(det.ts_end)   : '—');
+    setEl('md-dur',      `${mm}:${ss} (${durS}s)`);
+    setEl('md-energy',   `${(det.energy_wh||0).toFixed(3)} Wh`);
+    // Costo solo admin
+    const costRow = document.getElementById('md-cost-row');
+    if (costRow) costRow.style.display = (currentRole==='admin' && det.cost_mxn!=null) ? '' : 'none';
+    if (currentRole==='admin') setEl('md-cost', `$${(det.cost_mxn||0).toFixed(4)} MXN`);
+    // vs promedio
+    const avgDur = pro.avg_duration_s || 0;
+    const avgEwh = pro.avg_energy_wh  || 0;
+    if (avgDur > 0) {
+      const diffD = durS - avgDur;
+      const clsD  = diffD > 0 ? 'diff-up' : 'diff-down';
+      const signD = diffD > 0 ? '+' : '';
+      document.getElementById('md-vs-dur').innerHTML =
+        `<span class="${clsD}">${signD}${diffD.toFixed(0)}s vs ${avgDur.toFixed(0)}s prom.</span>`;
+    } else {
+      setEl('md-vs-dur', 'Sin datos de turno');
+    }
+    if (avgEwh > 0) {
+      const diffE = (det.energy_wh||0) - avgEwh;
+      const clsE  = diffE > 0 ? 'diff-up' : 'diff-down';
+      const signE = diffE > 0 ? '+' : '';
+      document.getElementById('md-vs-energy').innerHTML =
+        `<span class="${clsE}">${signE}${diffE.toFixed(2)}Wh vs ${avgEwh.toFixed(2)}Wh prom.</span>`;
+    } else {
+      setEl('md-vs-energy', 'Sin datos de turno');
+    }
+    const modal = document.getElementById('rfid-detail-modal');
+    if (modal) modal.classList.add('open');
+  } catch(e) { console.error('showRfidDetail', e); }
+}
+
+function closeRfidModal() {
+  const modal = document.getElementById('rfid-detail-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+// ── VIEW: Celda 3105 ──────────────────────────────────────────────────────────
+async function loadCelda() {
+  try {
+    const d = await window.pywebview.api.get_celda3105_status();
+    if (!d || d.error) { showCeldaOffline(true); return; }
+    const L = d.latest || {};
+    const K = d.kpis   || {};
+    const ops = d.operaciones || [];
+
+    const sinDatos = !d.connected;
+
+    showCeldaOffline(sinDatos);
+    const emergencia = !!L.emergencia;
+    const el = document.getElementById('celda-banner-emergencia');
+    if (el) el.style.display = emergencia ? '' : 'none';
+
+    // Badge estado
+    const badge = document.getElementById('celda-status-badge');
+    if (badge) {
+      badge.className = sinDatos ? 'badge badge-warning' : 'badge badge-success';
+      badge.innerHTML = `<span class="badge-dot"></span>${sinDatos ? 'Sin conexión' : 'En línea'}`;
+    }
+
+    // KPIs
+    const piezas = K.piezas_procesadas ?? L.piezas_procesadas ?? 0;
+    const ciclo  = K.tiempo_ciclo_promedio_s ?? L.tiempo_ciclo_promedio_s ?? 0;
+    const oee    = K.oee ?? L.oee ?? 0;
+    setEl('celda-piezas', piezas);
+    setEl('celda-ciclo',  ciclo.toFixed(1));
+    setEl('celda-oee',    oee.toFixed(1));
+
+    // Estado badge
+    const estadoEl    = document.getElementById('celda-estado');
+    const estadoBadge = document.getElementById('celda-estado-badge');
+    if (estadoEl) {
+      if (emergencia) {
+        estadoEl.textContent = '🔴 EMERGENCIA';
+        if (estadoBadge) estadoBadge.className = 'badge badge-danger';
+      } else if (L.modo_auto) {
+        estadoEl.textContent = '🟢 AUTOMÁTICO';
+        if (estadoBadge) estadoBadge.className = 'badge badge-success';
+      } else {
+        estadoEl.textContent = '🟡 MANUAL';
+        if (estadoBadge) estadoBadge.className = 'badge badge-warning';
+      }
+    }
+
+    // Señales PLC
+    setCeldaSignal('sig-emergencia',  L.emergencia,    true);
+    setCeldaSignal('sig-auto',        L.modo_auto,     false);
+    setCeldaSignal('sig-cobot',       L.cobot_activo,  false);
+    setCeldaSignal('sig-cognex',      L.cognex_foto,   false);
+    setCeldaSignal('sig-boton-verde', L.boton_verde,   false);
+
+    // Semáforo
+    const semEl = document.getElementById('celda-semaforo');
+    if (semEl) {
+      const v = L.semaforo_verde ? '🟢' : '⚪';
+      const r = L.semaforo_rojo  ? '🔴' : '⚪';
+      const b = L.semaforo_azul  ? '🔵' : '⚪';
+      semEl.textContent = `${v} ${r} ${b}`;
+    }
+
+    // Tabla operaciones
+    const tbody = document.getElementById('celda-ops-body');
+    if (tbody) {
+      if (!ops.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-hint)">Sin operaciones en este turno</td></tr>';
+      } else {
+        tbody.innerHTML = ops.map(o => {
+          const ico = o.aprobada ? '✅' : '❌';
+          return `<tr>
+            <td style="font-weight:500">${o.num ?? '—'}</td>
+            <td>${(o.tiempo_s ?? 0).toFixed(1)}s</td>
+            <td>${ico} ${o.aprobada ? 'Aprobada' : 'Rechazada'}</td>
+            <td style="color:var(--text-hint)">${o.hora ?? '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // Quality Gate bars
+    const aprobadas  = K.piezas_aprobadas  ?? L.piezas_aprobadas  ?? 0;
+    const rechazadas = K.piezas_rechazadas ?? L.piezas_rechazadas ?? 0;
+    const total = aprobadas + rechazadas || 1;
+    setEl('q-aprobadas-num',  aprobadas + ' / ' + total);
+    setEl('q-rechazadas-num', rechazadas + ' / ' + total);
+    const barA = document.getElementById('q-aprobadas-bar');
+    const barR = document.getElementById('q-rechazadas-bar');
+    if (barA) barA.style.width = (aprobadas  / total * 100).toFixed(1) + '%';
+    if (barR) barR.style.width = (rechazadas / total * 100).toFixed(1) + '%';
+
+    // Sincronizar KPIs Quality Gate view
+    setEl('q-total',      piezas);
+    setEl('q-aprobadas',  aprobadas);
+    setEl('q-rechazadas', rechazadas);
+    setEl('q-rendimiento', total > 1 ? (aprobadas / total * 100).toFixed(1) : '—');
+
+  } catch(e) { showCeldaOffline(true); }
+
+  if (!viewTimers.celdaFast) viewTimers.celdaFast = setInterval(loadCeldaFast, 200);
+  if (!viewTimers.celdaKpis) viewTimers.celdaKpis = setInterval(loadCeldaKpis, 500);
+}
+
+async function loadCeldaFast() {
+  try {
+    const d = await window.pywebview.api.get_celda_signals();
+    if (!d || d.error) return;
+    const L = d.signals || {};
+    const connected = !!d.connected;
+
+    showCeldaOffline(!connected);
+
+    const badge = document.getElementById('celda-status-badge');
+    if (badge) {
+      badge.className = !connected ? 'badge badge-warning' : 'badge badge-success';
+      badge.innerHTML = `<span class="badge-dot"></span>${!connected ? 'Sin conexión' : 'En línea'}`;
+    }
+
+    const emergencia = !!L.emergencia;
+    const elBanner = document.getElementById('celda-banner-emergencia');
+    if (elBanner) elBanner.style.display = emergencia ? '' : 'none';
+
+    const estadoEl    = document.getElementById('celda-estado');
+    const estadoBadge = document.getElementById('celda-estado-badge');
+    if (estadoEl) {
+      if (emergencia) {
+        estadoEl.textContent = '🔴 EMERGENCIA';
+        if (estadoBadge) estadoBadge.className = 'badge badge-danger';
+      } else if (L.modo_auto) {
+        estadoEl.textContent = '🟢 AUTOMÁTICO';
+        if (estadoBadge) estadoBadge.className = 'badge badge-success';
+      } else {
+        estadoEl.textContent = '🟡 MANUAL';
+        if (estadoBadge) estadoBadge.className = 'badge badge-warning';
+      }
+    }
+
+    setCeldaSignal('sig-emergencia',  L.emergencia,   true);
+    setCeldaSignal('sig-auto',        L.modo_auto,    false);
+    setCeldaSignal('sig-cobot',       L.cobot_activo, false);
+    setCeldaSignal('sig-cognex',      L.cognex?.foto, false);
+    setCeldaSignal('sig-boton-verde', L.boton_verde,  false);
+
+    const semEl = document.getElementById('celda-semaforo');
+    if (semEl) {
+      const s = L.semaforo || {};
+      semEl.textContent = `${s.verde ? '🟢' : '⚪'} ${s.rojo ? '🔴' : '⚪'} ${s.azul ? '🔵' : '⚪'}`;
+    }
+  } catch(e) {}
+}
+
+async function loadCeldaKpis() {
+  try {
+    const d = await window.pywebview.api.get_celda_kpis();
+    if (!d || d.error) return;
+    const K = d.kpis || {};
+    const ops = d.operaciones || [];
+
+    const piezas    = K.piezas_procesadas  ?? 0;
+    const ciclo     = K.tiempo_ciclo_promedio_s ?? 0;
+    const oee       = K.oee ?? 0;
+    const aprobadas = K.piezas_aprobadas  ?? 0;
+    const rechazadas= K.piezas_rechazadas ?? 0;
+
+    setEl('celda-piezas', piezas);
+    setEl('celda-ciclo',  ciclo.toFixed(1));
+    setEl('celda-oee',    oee.toFixed(1));
+
+    const total = aprobadas + rechazadas || 1;
+    setEl('q-aprobadas-num',  aprobadas + ' / ' + total);
+    setEl('q-rechazadas-num', rechazadas + ' / ' + total);
+    const barA = document.getElementById('q-aprobadas-bar');
+    const barR = document.getElementById('q-rechazadas-bar');
+    if (barA) barA.style.width = (aprobadas  / total * 100).toFixed(1) + '%';
+    if (barR) barR.style.width = (rechazadas / total * 100).toFixed(1) + '%';
+
+    setEl('q-total',      piezas);
+    setEl('q-aprobadas',  aprobadas);
+    setEl('q-rechazadas', rechazadas);
+    setEl('q-rendimiento', total > 1 ? (aprobadas / total * 100).toFixed(1) : '—');
+
+    const tbody = document.getElementById('celda-ops-body');
+    if (tbody && ops.length > 0) {
+      tbody.innerHTML = ops.map(o => {
+        const ico = o.aprobada ? '✅' : '❌';
+        return `<tr>
+          <td style="font-weight:500">${o.num ?? '—'}</td>
+          <td>${(o.tiempo_s ?? 0).toFixed(1)}s</td>
+          <td>${ico} ${o.aprobada ? 'Aprobada' : 'Rechazada'}</td>
+          <td style="color:var(--text-hint)">${o.hora ?? '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  } catch(e) {}
+}
+
+function showCeldaOffline(show) {
+  const el = document.getElementById('celda-banner-offline');
+  if (el) el.style.display = show ? '' : 'none';
+}
+
+function setCeldaSignal(id, value, invertColor) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const active = !!value;
+  const danger  = invertColor ? active : false;
+  const success = invertColor ? false : active;
+  el.className  = danger ? 'badge badge-danger' : success ? 'badge badge-success' : 'badge badge-warning';
+  el.innerHTML  = `<span class="badge-dot"></span>${active ? 'SÍ' : 'NO'}`;
+}
+
+// ── VIEW: Quality Gate ────────────────────────────────────────────────────────
+async function loadQuality() {
+  // Los KPIs Quality Gate ya se actualizan desde loadCelda()
+  // Solo inicializar la gráfica si no existe
+  if (qualChart) { qualChart.destroy(); qualChart = null; }
+  const ctx = document.getElementById('qualityChart');
+  if (!ctx) return;
+
+  // Obtener datos Quality Gate en tiempo real (MQTT)
+  let aprobadas = 0, rechazadas = 0;
+  try {
+    const d = await window.pywebview.api.get_quality_gate();
+    if (d && !d.error) {
+      const connected = !!d.connected;
+      aprobadas  = d.aprobadas  ?? 0;
+      rechazadas = d.rechazadas ?? 0;
+
+      const badge = document.getElementById('quality-status-badge');
+      if (badge) {
+        badge.className = connected ? 'badge badge-success' : 'badge badge-warning';
+        badge.innerHTML = `<span class="badge-dot"></span>${connected ? '● En vivo' : 'Sin datos reales'}`;
+      }
+      const noData = document.getElementById('quality-no-data');
+      if (noData) noData.style.display = connected ? 'none' : '';
+    }
+  } catch(e) {}
+
+  const hours = Array.from({length:8}, (_, i) => {
+    const d = new Date(); d.setHours(d.getHours() - 7 + i);
+    return d.toLocaleTimeString('es-MX', {hour:'2-digit'}) + 'h';
+  });
+  const lastH = hours[7];
+  const aData = Array(8).fill(0); aData[7] = aprobadas;
+  const rData = Array(8).fill(0); rData[7] = rechazadas;
+
+  qualChart = new Chart(ctx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: hours,
+      datasets: [
+        { label:'Aprobadas',  data: aData, backgroundColor:'rgba(59,109,17,0.2)',  borderColor:'#3B6D11', borderWidth:1 },
+        { label:'Rechazadas', data: rData, backgroundColor:'rgba(163,45,45,0.15)', borderColor:'#A32D2D', borderWidth:1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: { legend: { display:true, labels:{ font:{size:10}, color:'#6b6b6b', boxWidth:10 } } },
+      scales: {
+        x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false} },
+        y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false}, min:0 },
+      },
+    },
+  });
+
+  viewTimers.quality = setTimeout(loadQuality, 500);
+}
+
+// ── VIEW: Costos MXN ──────────────────────────────────────────────────────────
+async function loadCostos() {
+  try {
+    const d = await window.pywebview.api.get_cost_data();
+    if (!d || d.error) return;
+    const costo   = d.costo_mxn   || 0;
+    const kwh     = d.total_kwh   || 0;
+    const tarifa  = d.tarifa_kwh  || 2.80;
+    const ahorro  = d.ahorro_estimado_mxn || 0;
+    const roi     = d.roi_pct     || 0;
+
+    setEl('c-dia',         `$${costo.toFixed(2)}`);
+    setEl('c-kwh-mes',     (kwh * 30).toFixed(1));
+    setEl('c-proy',        `$${(costo * 30).toFixed(0)}`);
+    setEl('c-ahorro',      `$${ahorro.toFixed(2)}`);
+    setEl('c-kwh-torno',   kwh.toFixed(3));
+    setEl('c-mxn-torno',   `$${costo.toFixed(2)}`);
+    setEl('c-pct-torno',   '100');
+    setEl('c-tarifa',      `$${tarifa.toFixed(2)} MXN/kWh`);
+    setEl('c-roi',         roi.toFixed(1));
+    setEl('c-ahorro-anual', (ahorro * 365).toFixed(0));
+  } catch(e) {}
+}
+
+// ── VIEW: Usuarios ────────────────────────────────────────────────────────────
+async function loadUsuarios() {
+  await renderUsers();
+}
+
+async function renderUsers() {
+  try {
+    const users = await window.pywebview.api.get_users();
+    const tbody  = document.getElementById('users-tbody');
+    if (!tbody) return;
+    if (!users || !users.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-hint)">Sin usuarios</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td style="font-weight:500">${u.username}</td>
+        <td><span class="badge ${u.rol==='admin'?'badge-warning':'badge-success'}"><span class="badge-dot"></span>${u.rol}</span></td>
+        <td style="font-size:11px;color:var(--text-hint)">${u.created_at || '—'}</td>
+        <td><span class="badge ${u.activo?'badge-success':'badge-danger'}"><span class="badge-dot"></span>${u.activo?'activo':'inactivo'}</span></td>
+        <td>${u.username !== 'admin' ? `<button class="btn-del" data-user="${u.username}" onclick="confirmDelete('${u.username}', this)">Eliminar</button>` : ''}</td>
+      </tr>`).join('');
+  } catch(e) {}
+}
+
+function confirmDelete(username, btn) {
+  if (pendingDelete === username) {
+    pywebview.api.delete_user(username).then(res => {
+      pendingDelete = null;
+      if (res && res.success) renderUsers();
+    }).catch(() => { pendingDelete = null; });
+  } else {
+    if (pendingDelete) {
+      // Reset previous pending button
+      const prev = document.querySelector(`[data-user="${pendingDelete}"]`);
+      if (prev) { prev.textContent = 'Eliminar'; prev.style.cssText = ''; }
+    }
+    pendingDelete = username;
+    btn.textContent = '¿Confirmar?';
+    btn.style.background = 'var(--danger-text)';
+    btn.style.color = '#fff';
+    setTimeout(() => {
+      if (pendingDelete === username) {
+        pendingDelete = null;
+        if (btn.isConnected) { btn.textContent = 'Eliminar'; btn.style.cssText = ''; }
+      }
+    }, 4000);
+  }
+}
+
+function toggleAddForm() {
+  const form = document.getElementById('add-user-form');
+  const msg  = document.getElementById('add-user-msg');
+  if (form.style.display === 'none') {
+    form.style.display = 'block';
+    document.getElementById('new-username').focus();
+  } else {
+    form.style.display = 'none';
+    if (msg) msg.textContent = '';
+  }
+}
+
+async function submitAddUser() {
+  const user = document.getElementById('new-username').value.trim();
+  const pin  = document.getElementById('new-pin').value.trim();
+  const rol  = document.getElementById('new-rol').value;
+  const msg  = document.getElementById('add-user-msg');
+  if (!user || !pin) { msg.style.color='var(--danger-text)'; msg.textContent='Completa todos los campos'; return; }
+  try {
+    const res = await window.pywebview.api.add_user(user, pin, rol);
+    if (res && res.success) {
+      msg.style.color = 'var(--success-text)';
+      msg.textContent = res.message || 'Usuario creado';
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-pin').value = '';
+      renderUsers();
+      setTimeout(() => { document.getElementById('add-user-form').style.display='none'; msg.textContent=''; }, 1800);
+    } else {
+      msg.style.color = 'var(--danger-text)';
+      msg.textContent = (res && res.message) || 'Error al crear usuario';
+    }
+  } catch(e) { msg.style.color='var(--danger-text)'; msg.textContent='Error de conexión'; }
+}
+
+// ── VIEW: Auditoría ───────────────────────────────────────────────────────────
+async function loadAuditoria() {
+  try {
+    auditAllLogs = await window.pywebview.api.get_audit_logs();
+    const users   = [...new Set(auditAllLogs.map(l => l.username))].sort();
+    const actions = [...new Set(auditAllLogs.map(l => l.accion))].sort();
+    const uSel    = document.getElementById('audit-filter-user');
+    const aSel    = document.getElementById('audit-filter-action');
+    if (uSel) uSel.innerHTML = '<option value="">Todos los usuarios</option>' +
+      users.map(u => `<option value="${u}">${u}</option>`).join('');
+    if (aSel) aSel.innerHTML = '<option value="">Todas las acciones</option>' +
+      actions.map(a => `<option value="${a}">${a}</option>`).join('');
+  } catch(e) { auditAllLogs = []; }
+  auditPage = 1;
+  renderAudit();
+}
+
+function renderAudit() {
+  const filterUser   = document.getElementById('audit-filter-user')?.value   || '';
+  const filterAction = document.getElementById('audit-filter-action')?.value || '';
+  const filtered     = auditAllLogs.filter(l =>
+    (!filterUser   || l.username === filterUser) &&
+    (!filterAction || l.accion   === filterAction)
+  );
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / AUDIT_PER));
+  if (auditPage > pages) auditPage = pages;
+
+  setEl('audit-page-info',  `Pág. ${auditPage} / ${pages} — ${total} registros`);
+  setEl('audit-total-hint', `${total} entradas`);
+  const prev = document.getElementById('audit-prev');
+  const next = document.getElementById('audit-next');
+  if (prev) prev.disabled = auditPage <= 1;
+  if (next) next.disabled = auditPage >= pages;
+
+  const start = (auditPage - 1) * AUDIT_PER;
+  const logs  = filtered.slice(start, start + AUDIT_PER);
+  const tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-hint)">Sin registros</td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td style="font-size:11px;color:var(--text-hint);white-space:nowrap">${l.timestamp || '—'}</td>
+      <td style="font-weight:500">${l.username || '—'}</td>
+      <td style="font-size:12px">${l.accion || '—'}</td>
+      <td style="font-size:11px;color:var(--text-hint)">${l.ip || '—'}</td>
+      <td><span class="badge ${l.exitoso ? 'badge-success' : 'badge-danger'}"><span class="badge-dot"></span>${l.exitoso ? 'ok' : 'fail'}</span></td>
+    </tr>`).join('');
+}
+
+function auditPrev() { if (auditPage > 1) { auditPage--; renderAudit(); } }
+function auditNext() {
+  const filterUser   = document.getElementById('audit-filter-user')?.value   || '';
+  const filterAction = document.getElementById('audit-filter-action')?.value || '';
+  const total = auditAllLogs.filter(l =>
+    (!filterUser   || l.username === filterUser) &&
+    (!filterAction || l.accion   === filterAction)
+  ).length;
+  if (auditPage < Math.ceil(total / AUDIT_PER)) { auditPage++; renderAudit(); }
+}
+
+// ── Tecla Z — Simulación RFID ────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    e.preventDefault();
+    simulateRfidScan();
+  }
+});
+
+async function simulateRfidScan() {
+  try {
+    const result = await window.pywebview.api.simulate_rfid_scan();
+    if (!result || result.error) {
+      showToast('⚠️ RFID SIM — ' + (result?.error || 'error'), 'warning');
+      return;
+    }
+    if (result.event === 'start') {
+      showToast('🟢 RFID SIM — Ciclo iniciado: ' + result.part_id, 'success');
+    } else {
+      showToast('⚪ RFID SIM — Ciclo terminado (' + result.duration_s + 's)', 'info');
+    }
+    if (currentView === 'rfid') setTimeout(loadRFID, 800);
+  } catch(e) {
+    showToast('⚠️ RFID SIM — sin conexión con backend', 'warning');
+  }
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('sim-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'sim-toast sim-toast-' + type + ' sim-toast-show';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.className = 'sim-toast'; }, 2500);
+}
+</script>
+
+<div id="sim-toast" class="sim-toast"></div>
+<style>
+.sim-toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  pointer-events: none; opacity: 0; transition: opacity 0.25s; z-index: 9999;
+  white-space: nowrap;
+}
+.sim-toast-show   { opacity: 1; }
+.sim-toast-success { background: #1a3a2a; color: #2ed573; border: 1px solid #2ed573; }
+.sim-toast-info    { background: #1a2a3a; color: #74b9ff; border: 1px solid #74b9ff; }
+.sim-toast-warning { background: #3a2a1a; color: #ffa502; border: 1px solid #ffa502; }
+</style>
+</body>
+</html>

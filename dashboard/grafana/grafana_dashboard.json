@@ -1,0 +1,954 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB_SMARTMFG",
+      "label": "InfluxDB-SmartMfg",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB",
+      "value": "P76E10D56DC830ADB"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "description": "Smart Manufacturing CIMA + Celda 3105 — KPIs en tiempo real",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "⚡ Energía — Planta CIMA",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1500
+              },
+              {
+                "color": "red",
+                "value": 2500
+              }
+            ]
+          },
+          "unit": "watt",
+          "min": 0,
+          "max": 3000
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "title": "Potencia Actual",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"power_w\")\n  |> last()\n  |> yield(name: \"last\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "amp",
+          "min": 0,
+          "max": 15
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "Corriente (Irms)",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"irms_a\")\n  |> last()\n  |> yield(name: \"last\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Watts",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 3000
+              }
+            ]
+          },
+          "unit": "watt"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "Historial Potencia (última hora)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"power_w\")\n  |> aggregateWindow(every: 30s, fn: mean, createEmpty: false)\n  |> yield(name: \"mean\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "kwatth",
+          "decimals": 4
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 9
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Energía Acumulada (última hora)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"energy_kwh\")\n  |> sum()\n  |> yield(name: \"sum\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simulated"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "1": {
+                        "text": "🟡 SIM"
+                      },
+                      "0": {
+                        "text": "🟢 REAL"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 9
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Modo Operación",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -2m)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"simulated\")\n  |> last()\n  |> yield(name: \"last\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 101,
+      "title": "📦 Trazabilidad — Ciclos Productivos",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 14
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "count"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Ciclos Hoy",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: today())\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"cycle_active\")\n  |> filter(fn: (r) => r._value == true)\n  |> count()\n  |> yield(name: \"count\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "power_w"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Potencia (W)"
+              },
+              {
+                "id": "unit",
+                "value": "watt"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1500
+                    },
+                    {
+                      "color": "red",
+                      "value": 2500
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_time"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Timestamp"
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "machine"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Máquina"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 4,
+        "y": 14
+      },
+      "id": 7,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Timestamp"
+          }
+        ]
+      },
+      "title": "Últimas Lecturas por Máquina",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"power_w\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> yield(name: \"mean\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 102,
+      "title": "🚨 Alertas — Anomalías de Consumo",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 3000
+              }
+            ]
+          },
+          "unit": "watt"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "title": "Picos de Consumo (últimas 6 horas) — línea roja = umbral anomalía (3000W)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          },
+          "query": "from(bucket: \"sensor-data\")\n  |> range(start: -6h)\n  |> filter(fn: (r) => r._measurement == \"cima_energy\")\n  |> filter(fn: (r) => r._field == \"power_w\")\n  |> aggregateWindow(every: 1m, fn: max, createEmpty: false)\n  |> yield(name: \"max\")",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "🏷  RFID — Estado de Tarjeta",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Estado RFID",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 41
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Sin tarjeta",
+                  "color": "gray"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Tarjeta presente",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor-data\") |> range(start: -1m) |> filter(fn: (r) => r._measurement == \"rfid_status\" and r._field == \"presente\") |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          }
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "Última Tarjeta (UID)",
+      "gridPos": {
+        "h": 4,
+        "w": 10,
+        "x": 6,
+        "y": 41
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor-data\") |> range(start: -1m) |> filter(fn: (r) => r._measurement == \"rfid_status\" and r._field == \"uid\") |> last()",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          }
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Historial RFID (última hora)",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 41
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "P76E10D56DC830ADB"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "hidden"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "min": 0,
+          "max": 1,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Ausente"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Presente"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "from(bucket: \"sensor-data\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"rfid_status\" and r._field == \"presente\")",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "P76E10D56DC830ADB"
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": [
+    "smart-manufacturing",
+    "cima",
+    "iot",
+    "energia"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "America/Mexico_City",
+  "title": "Smart Manufacturing — CIMA KPIs",
+  "uid": "smart-mfg-cima-v1",
+  "version": 1
+}

@@ -1,0 +1,420 @@
+{
+  "name": "Smart Manufacturing — MQTT to InfluxDB",
+  "nodes": [
+    {
+      "parameters": {
+        "topics": [
+          {
+            "topic": "cima/machines/+/energy"
+          },
+          {
+            "topic": "cima/machines/+/cycle"
+          },
+          {
+            "topic": "cima/rfid/scan"
+          },
+          {
+            "topic": "cima/system/heartbeat"
+          }
+        ],
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "MQTT Trigger",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "credentials": {
+        "mqtt": {
+          "id": "mqtt-cred-01",
+          "name": "MQTT RPi5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const topic = $input.item.json.topic || '';\nlet data;\ntry {\n  data = JSON.parse($input.item.json.message || '{}');\n} catch(e) {\n  data = { raw: $input.item.json.message };\n}\n\ndata._topic = topic;\ndata._plant = topic.startsWith('cima') ? 'cima' : 'celda3105';\ndata._type = topic.split('/').pop();\ndata._receivedAt = new Date().toISOString();\ndata._discard = false;\ndata._discard_reason = '';\n\n// ── CAPA 4: filtros de energía en n8n ──────────────────────────────────\nif (data._type === 'energy') {\n  const powerW = parseFloat(data.power_w) || 0;\n  const MAX_POWER_W = 2000;  // torno max esperado ~1390W\n\n  // 4a: potencia fuera del rango físico del torno\n  if (powerW > MAX_POWER_W) {\n    data._discard = true;\n    data._discard_reason = 'power_over_limit';\n  }\n\n  // 4b: spike temporal — power_w > anterior * 2 en menos de 5 s\n  if (!data._discard) {\n    const state = $getWorkflowStaticData('global');\n    const key = 'prev_power_' + (data.machine_id || 'unknown');\n    const prev = state[key];\n    const now = Date.now();\n\n    if (prev && (now - prev.ts < 5000) && prev.power_w > 0 && powerW > prev.power_w * 2) {\n      data._discard = true;\n      data._discard_reason = 'spike';\n    }\n\n    if (!data._discard) {\n      state[key] = { power_w: powerW, ts: now };\n    }\n  }\n}\n\nreturn { json: data };"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Parsear mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-01",
+              "leftValue": "={{ $json._type }}",
+              "rightValue": "energy",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Es dato de energía?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-03",
+              "leftValue": "={{ $json._discard }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "Dato válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8086/api/v2/write",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain; charset=utf-8"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "org",
+              "value": "smart-manufacturing"
+            },
+            {
+              "name": "bucket",
+              "value": "sensor-data"
+            },
+            {
+              "name": "precision",
+              "value": "ms"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "=cima_energy,machine={{ $json.machine_id || 'unknown' }} power_w={{ $json.power_w || 0 }},irms_a={{ $json.irms_a || 0 }},energy_kwh={{ $json.energy_kwh || 0 }},simulated={{ $json.simulated ? 1 : 0 }},filtered={{ $json.filtered ? 1 : 0 }},raw_irms={{ $json.raw_irms !== undefined ? $json.raw_irms : ($json.irms_a || 0) }} {{ Date.now() }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Guardar en InfluxDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 160],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "influx-cred-01",
+          "name": "InfluxDB Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-02",
+              "leftValue": "={{ $json.power_w }}",
+              "rightValue": 3000,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Anomalía de consumo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.item.json;\nreturn {\n  json: {\n    alert: 'HIGH_POWER',\n    severity: d.power_w > 5000 ? 'critical' : 'warning',\n    machine: d.machine_id,\n    power_w: d.power_w,\n    message: `Consumo anómalo en ${d.machine_id}: ${d.power_w}W`,\n    ts: new Date().toISOString()\n  }\n};"
+      },
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Generar alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "rfid-cond-01",
+              "leftValue": "={{ $json._type }}",
+              "rightValue": "scan",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "rfid-cond-02",
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "stop",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0008-0008-0008-000000000008",
+      "name": "Es RFID stop?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.item.json;\nconst m   = String(d.machine_id || 'unknown').replace(/[, =]/g, '_');\nconst u   = String(d.uid || 'unknown').replace(/:/g, '-').replace(/[, =]/g, '_');\nconst pid = String(d.part_id || 'unknown').replace(/[, =]/g, '_').replace(/:/g, '-');\n\nconst dur  = parseFloat(d.duration_s) || 0;\nconst ewh  = parseFloat(d.energy_wh) || 0.0;\nconst cost = parseFloat((ewh / 1000.0 * 2.80).toFixed(4));\n\nconst tsEnd   = d.ts || new Date().toISOString();\nconst tsEndMs = Date.now();\nconst tsStartMs = tsEndMs - Math.round(dur * 1000);\nconst tsStart = new Date(tsStartMs).toISOString();\n\n// InfluxDB line protocol — string fields entre comillas\nconst line = 'cima_rfid_cycles,machine_id=' + m + ',uid=' + u + ',part_id=' + pid +\n  ' duration_s=' + dur.toFixed(1) +\n  ',energy_wh=' + ewh.toFixed(3) +\n  ',cost_mxn=' + cost +\n  ',ts_start=\"' + tsStart + '\"' +\n  ',ts_end=\"' + tsEnd + '\" ' +\n  tsEndMs;\n\n// Payload para MQTT completed\nconst completedPayload = {\n  part_id:    d.part_id || 'unknown',\n  uid:        d.uid || 'unknown',\n  machine_id: d.machine_id || 'unknown',\n  duration_s: parseFloat(dur.toFixed(1)),\n  energy_wh:  parseFloat(ewh.toFixed(3)),\n  cost_mxn:   cost,\n  ts_start:   tsStart,\n  ts_end:     tsEnd\n};\n\nreturn { json: { ...d, _influx_line: line, _completed_payload: JSON.stringify(completedPayload) } };"
+      },
+      "id": "a1b2c3d4-0009-0009-0009-000000000009",
+      "name": "Preparar línea RFID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8086/api/v2/write",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain; charset=utf-8"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "org",
+              "value": "smart-manufacturing"
+            },
+            {
+              "name": "bucket",
+              "value": "sensor-data"
+            },
+            {
+              "name": "precision",
+              "value": "ms"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $json._influx_line }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "Guardar ciclo RFID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 420],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "influx-cred-01",
+          "name": "InfluxDB Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = JSON.parse($input.item.json._completed_payload || '{}');\nconsole.log('[RFID COMPLETED]', JSON.stringify(payload));\nreturn { json: payload };"
+      },
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Publicar completed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 420]
+    }
+  ],
+  "connections": {
+    "MQTT Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parsear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Es dato de energía?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es dato de energía?": {
+      "main": [
+        [
+          {
+            "node": "Dato válido?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Es RFID stop?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dato válido?": {
+      "main": [
+        [
+          {
+            "node": "Guardar en InfluxDB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Guardar en InfluxDB": {
+      "main": [
+        [
+          {
+            "node": "Anomalía de consumo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomalía de consumo?": {
+      "main": [
+        [
+          {
+            "node": "Generar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Es RFID stop?": {
+      "main": [
+        [
+          {
+            "node": "Preparar línea RFID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Preparar línea RFID": {
+      "main": [
+        [
+          {
+            "node": "Guardar ciclo RFID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar ciclo RFID": {
+      "main": [
+        [
+          {
+            "node": "Publicar completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-05-29T00:00:00.000Z",
+  "versionId": "v2"
+}

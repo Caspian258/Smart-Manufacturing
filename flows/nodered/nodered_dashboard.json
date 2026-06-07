@@ -1,0 +1,942 @@
+[
+  {
+    "id": "tab-smfg",
+    "type": "tab",
+    "label": "Smart Manufacturing",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "tab-celda3105",
+    "type": "tab",
+    "label": "Celda 3105 — PLC",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "ui-group-energy",
+    "type": "ui_group",
+    "name": "Energía — Planta CIMA",
+    "tab": "ui-tab-main",
+    "order": 1,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "ui-group-status",
+    "type": "ui_group",
+    "name": "Estado del Sistema",
+    "tab": "ui-tab-main",
+    "order": 2,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "ui-group-kpis",
+    "type": "ui_group",
+    "name": "KPIs en Tiempo Real",
+    "tab": "ui-tab-main",
+    "order": 3,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "ui-tab-main",
+    "type": "ui_tab",
+    "name": "Dashboard CIMA",
+    "icon": "dashboard",
+    "order": 1,
+    "disp": true
+  },
+  {
+    "id": "ui-tab-celda",
+    "type": "ui_tab",
+    "name": "Celda 3105",
+    "icon": "memory",
+    "order": 2,
+    "disp": true
+  },
+  {
+    "id": "ui-group-celda-estado",
+    "type": "ui_group",
+    "name": "Estado Celda 3105",
+    "tab": "ui-tab-celda",
+    "order": 1,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "ui-group-celda-estaciones",
+    "type": "ui_group",
+    "name": "Estaciones de Trabajo",
+    "tab": "ui-tab-celda",
+    "order": 2,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "ui-group-celda-kpis",
+    "type": "ui_group",
+    "name": "KPIs Celda 3105",
+    "tab": "ui-tab-celda",
+    "order": 3,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "mqtt-in-energy",
+    "type": "mqtt in",
+    "z": "tab-smfg",
+    "name": "MQTT — Energía",
+    "topic": "cima/machines/+/energy",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mqtt-broker-config",
+    "nl": false,
+    "rap": false,
+    "rh": 0,
+    "inputs": 0,
+    "x": 120,
+    "y": 100,
+    "wires": [
+      [
+        "parse-energy",
+        "fmt-influx-energy"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt-in-heartbeat",
+    "type": "mqtt in",
+    "z": "tab-smfg",
+    "name": "MQTT — Heartbeat",
+    "topic": "cima/system/heartbeat",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mqtt-broker-config",
+    "nl": false,
+    "rap": false,
+    "rh": 0,
+    "inputs": 0,
+    "x": 120,
+    "y": 200,
+    "wires": [
+      [
+        "parse-heartbeat"
+      ]
+    ]
+  },
+  {
+    "id": "parse-energy",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "Parsear energía",
+    "func": "const d = msg.payload;\nmsg.power = { payload: d.power_w || 0 };\nmsg.irms = { payload: parseFloat((d.irms_a || 0).toFixed(2)) };\nmsg.cycle = { payload: d.cycle_active ? '🔴 EN CICLO: ' + (d.part_id || '') : '⚪ Sin ciclo' };\nmsg.mode = { payload: d.simulated ? '🟡 SIMULACIÓN' : '🟢 REAL' };\nmsg.payload = d.power_w || 0;\nreturn msg;",
+    "outputs": 1,
+    "x": 360,
+    "y": 100,
+    "wires": [
+      [
+        "gauge-power",
+        "text-cycle",
+        "text-mode",
+        "chart-power"
+      ]
+    ]
+  },
+  {
+    "id": "parse-heartbeat",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "Parsear heartbeat",
+    "func": "const d = msg.payload;\nmsg.payload = '🟢 Online — ' + (d.device || '') + ' | RSSI: ' + (d.rssi || 0) + ' dBm | Uptime: ' + Math.floor((d.uptime || 0)/60) + ' min';\nreturn msg;",
+    "outputs": 1,
+    "x": 360,
+    "y": 200,
+    "wires": [
+      [
+        "text-status"
+      ]
+    ]
+  },
+  {
+    "id": "gauge-power",
+    "type": "ui_gauge",
+    "z": "tab-smfg",
+    "name": "Potencia actual",
+    "group": "ui-group-energy",
+    "order": 1,
+    "width": "3",
+    "height": "3",
+    "gtype": "gage",
+    "title": "Potencia (W)",
+    "label": "W",
+    "format": "{{value}}",
+    "min": 0,
+    "max": 3000,
+    "colors": [
+      "#00b500",
+      "#e6e600",
+      "#ca3838"
+    ],
+    "seg1": 1000,
+    "seg2": 2000,
+    "x": 620,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "chart-power",
+    "type": "ui_chart",
+    "z": "tab-smfg",
+    "name": "Historial energía",
+    "group": "ui-group-energy",
+    "order": 2,
+    "width": "6",
+    "height": "4",
+    "label": "Consumo kW",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "Sin datos aún",
+    "dot": false,
+    "ymin": "0",
+    "ymax": "3000",
+    "removeOlder": 1,
+    "removeOlderPoints": "100",
+    "removeOlderUnit": "3600",
+    "cutout": 0,
+    "useOneColor": false,
+    "useUTC": false,
+    "colors": [
+      "#1f77b4"
+    ],
+    "outputs": 1,
+    "x": 620,
+    "y": 120,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "text-cycle",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-status",
+    "order": 1,
+    "width": "6",
+    "height": "1",
+    "name": "Estado ciclo",
+    "label": "Ciclo productivo",
+    "format": "{{msg.cycle.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 620,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "text-mode",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-status",
+    "order": 2,
+    "width": "6",
+    "height": "1",
+    "name": "Modo",
+    "label": "Modo operación",
+    "format": "{{msg.mode.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 620,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "text-status",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-status",
+    "order": 3,
+    "width": "6",
+    "height": "1",
+    "name": "Estado ESP32",
+    "label": "Gateway IoT",
+    "format": "{{value}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 620,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "id": "inject-oee",
+    "type": "inject",
+    "z": "tab-smfg",
+    "name": "Calcular OEE cada minuto",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 2,
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 340,
+    "wires": [
+      [
+        "calc-oee"
+      ]
+    ]
+  },
+  {
+    "id": "calc-oee",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "Calcular OEE simulado",
+    "func": "const disponibilidad = 0.90 + (Math.random() * 0.08);\nconst rendimiento = 0.88 + (Math.random() * 0.10);\nconst calidad = 0.95 + (Math.random() * 0.04);\nconst oee = disponibilidad * rendimiento * calidad;\nmsg.payload = parseFloat((oee * 100).toFixed(1));\nmsg.disponibilidad = parseFloat((disponibilidad * 100).toFixed(1));\nmsg.rendimiento = parseFloat((rendimiento * 100).toFixed(1));\nmsg.calidad = parseFloat((calidad * 100).toFixed(1));\nreturn msg;",
+    "outputs": 1,
+    "x": 400,
+    "y": 340,
+    "wires": [
+      [
+        "gauge-oee",
+        "text-disp",
+        "text-rend",
+        "text-cal"
+      ]
+    ]
+  },
+  {
+    "id": "gauge-oee",
+    "type": "ui_gauge",
+    "z": "tab-smfg",
+    "name": "OEE Global",
+    "group": "ui-group-kpis",
+    "order": 1,
+    "width": "3",
+    "height": "3",
+    "gtype": "gage",
+    "title": "OEE Global (%)",
+    "label": "%",
+    "format": "{{value}}%",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": 60,
+    "seg2": 80,
+    "x": 660,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "text-disp",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-kpis",
+    "order": 2,
+    "width": "3",
+    "height": "1",
+    "name": "Disponibilidad",
+    "label": "Disponibilidad",
+    "format": "{{msg.disponibilidad}}%",
+    "layout": "row-spread",
+    "className": "",
+    "x": 660,
+    "y": 360,
+    "wires": []
+  },
+  {
+    "id": "text-rend",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-kpis",
+    "order": 3,
+    "width": "3",
+    "height": "1",
+    "name": "Rendimiento",
+    "label": "Rendimiento",
+    "format": "{{msg.rendimiento}}%",
+    "layout": "row-spread",
+    "className": "",
+    "x": 660,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "text-cal",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "group": "ui-group-kpis",
+    "order": 4,
+    "width": "3",
+    "height": "1",
+    "name": "Calidad",
+    "label": "Calidad",
+    "format": "{{msg.calidad}}%",
+    "layout": "row-spread",
+    "className": "",
+    "x": 660,
+    "y": 440,
+    "wires": []
+  },
+  {
+    "id": "mqtt-broker-config",
+    "type": "mqtt-broker",
+    "name": "RPi5 MQTT",
+    "broker": "127.0.0.1",
+    "port": "1883",
+    "clientid": "nodered-smfg",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "plc-s7-config",
+    "type": "s7 endpoint",
+    "transport": "iso-on-tcp",
+    "address": "192.168.1.50",
+    "port": 102,
+    "rack": 0,
+    "slot": 1,
+    "localtsaphi": "01",
+    "localtsaplo": "00",
+    "remotetsaphi": "01",
+    "remotetsaplo": "00",
+    "connmode": "rack-slot",
+    "adapter": "",
+    "busaddr": 2,
+    "cycletime": 50,
+    "timeout": 500,
+    "name": "PLC Celda 3105",
+    "vartable": [
+      {
+        "name": "C2_Killswitch",
+        "addr": "I9.7"
+      },
+      {
+        "name": "C2_Estampado_Down",
+        "addr": "Q8.5"
+      },
+      {
+        "name": "C2_Estampado_Up",
+        "addr": "Q8.4"
+      },
+      {
+        "name": "C2_Banda_1",
+        "addr": "Q0.0"
+      },
+      {
+        "name": "C2_Banda_2",
+        "addr": "Q0.2"
+      },
+      {
+        "name": "C2_Banda_3",
+        "addr": "Q0.4"
+      },
+      {
+        "name": "C2_Banda_4",
+        "addr": "Q0.7"
+      },
+      {
+        "name": "C2_Banda_Enfrente",
+        "addr": "Q8.2"
+      },
+      {
+        "name": "C2_Bandas_Atras",
+        "addr": "Q8.3"
+      },
+      {
+        "name": "C2_Taladro_1",
+        "addr": "Q0.3"
+      },
+      {
+        "name": "C2_Taladro_2",
+        "addr": "Q0.5"
+      },
+      {
+        "name": "C2_Martillo_1",
+        "addr": "Q0.1"
+      },
+      {
+        "name": "C2_Martillo_2",
+        "addr": "Q0.6"
+      },
+      {
+        "name": "Cognex_in0",
+        "addr": "Q8.7"
+      },
+      {
+        "name": "Cognex_out0",
+        "addr": "I9.0"
+      },
+      {
+        "name": "Cognex_out1",
+        "addr": "I9.1"
+      },
+      {
+        "name": "Pieza_rechazada",
+        "addr": "M30.5"
+      },
+      {
+        "name": "M_Ci1_cobot",
+        "addr": "M30.2"
+      },
+      {
+        "name": "M_Ci2_cobot",
+        "addr": "M30.3"
+      },
+      {
+        "name": "M_Ci3_cobot",
+        "addr": "M30.4"
+      },
+      {
+        "name": "C2_Verde_Celda",
+        "addr": "Q9.5"
+      },
+      {
+        "name": "C2_Rojo_Celda",
+        "addr": "Q9.6"
+      },
+      {
+        "name": "C2_Azul_Celda",
+        "addr": "Q9.7"
+      },
+      {
+        "name": "C2_Cuadro_Verde",
+        "addr": "Q1.0"
+      },
+      {
+        "name": "C2_Cuadro_Rojo",
+        "addr": "Q1.1"
+      },
+      {
+        "name": "C2_Boton_Verde",
+        "addr": "I9.4"
+      }
+    ]
+  },
+  {
+    "id": "plc-poller",
+    "type": "s7 in",
+    "z": "tab-celda3105",
+    "endpoint": "plc-s7-config",
+    "mode": "all",
+    "variable": "",
+    "diff": false,
+    "name": "Leer PLC Celda 3105",
+    "x": 140,
+    "y": 100,
+    "wires": [
+      [
+        "parse-plc",
+        "debug-plc-raw"
+      ]
+    ]
+  },
+  {
+    "id": "debug-plc-raw",
+    "type": "debug",
+    "z": "tab-celda3105",
+    "name": "RAW PLC",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 380,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "parse-plc",
+    "type": "function",
+    "z": "tab-celda3105",
+    "name": "Procesar tags PLC",
+    "func": "const d = msg.payload;\nif (!d) return null;\n\nconst ctx = context.global;\nif (!ctx.get('plc_init')) {\n    ctx.set('plc_init', true);\n    ctx.set('estampado_prev', false);\n    ctx.set('cognex_in_prev', false);\n    ctx.set('aprobada_prev', false);\n    ctx.set('boton_verde_prev', false);\n    ctx.set('cognex_ts_start', null);\n    ctx.set('piezas_procesadas', 0);\n    ctx.set('piezas_aprobadas', 0);\n    ctx.set('piezas_rechazadas', 0);\n    ctx.set('ciclos_tiempos', []);\n    ctx.set('turno_inicio', Date.now());\n}\n\n// Reset turno cada 8 horas\nconst turnoInicio = ctx.get('turno_inicio') || Date.now();\nif (Date.now() - turnoInicio > 8 * 3600 * 1000) {\n    ctx.set('piezas_procesadas', 0);\n    ctx.set('piezas_aprobadas', 0);\n    ctx.set('piezas_rechazadas', 0);\n    ctx.set('ciclos_tiempos', []);\n    ctx.set('turno_inicio', Date.now());\n}\n\n// Estado básico\nconst killswitch     = d.C2_Killswitch     || false;\nconst modo_auto      = killswitch;\nconst cobot_activo   = (d.M_Ci1_cobot || false) || (d.M_Ci2_cobot || false) || (d.M_Ci3_cobot || false);\nconst aprobada       = (d.Cognex_out0 || false) || (d.Cognex_out1 || false);\nconst estampado_down = d.C2_Estampado_Down || false;\nconst cognex_in      = d.Cognex_in0        || false;\nconst boton_verde    = d.C2_Boton_Verde   || false;\n\n// Flanco descendente Estampado_Down → pieza procesada\nconst estampado_prev = ctx.get('estampado_prev');\nif (estampado_prev === true && estampado_down === false) {\n    const piezas = (ctx.get('piezas_procesadas') || 0) + 1;\n    ctx.set('piezas_procesadas', piezas);\n\n    const cognexTs = ctx.get('cognex_ts_start');\n    if (cognexTs) {\n        const tciclo = (Date.now() - cognexTs) / 1000;\n        let ciclos = ctx.get('ciclos_tiempos') || [];\n        ciclos.push(tciclo);\n        if (ciclos.length > 20) ciclos = ciclos.slice(-20);\n        ctx.set('ciclos_tiempos', ciclos);\n        ctx.set('cognex_ts_start', null);\n    }\n\n}\nctx.set('estampado_prev', estampado_down);\n\n// Flanco ascendente Cognex_in0 → inicio de ciclo\nconst cognex_prev = ctx.get('cognex_in_prev');\nif (cognex_prev === false && cognex_in === true) {\n    ctx.set('cognex_ts_start', Date.now());\n}\nctx.set('cognex_in_prev', cognex_in);\n\n// Flanco ascendente aprobada (Cognex_out0 OR Cognex_out1)\nconst aprobada_prev = ctx.get('aprobada_prev');\nif (aprobada_prev === false && aprobada === true) {\n    ctx.set('piezas_aprobadas', (ctx.get('piezas_aprobadas') || 0) + 1);\n}\nctx.set('aprobada_prev', aprobada);\n\n// Flanco ascendente Boton_Verde AND Pieza_rechazada → rechazo confirmado por operador\nconst rechazada_signal = d.Pieza_rechazada || false;\nconst boton_verde_prev = ctx.get('boton_verde_prev');\nif (boton_verde_prev === false && boton_verde === true && rechazada_signal) {\n    ctx.set('piezas_rechazadas', (ctx.get('piezas_rechazadas') || 0) + 1);\n}\nctx.set('boton_verde_prev', boton_verde);\n\n// KPIs calculados\nconst piezas_procesadas = ctx.get('piezas_procesadas') || 0;\nconst piezas_aprobadas  = ctx.get('piezas_aprobadas')  || 0;\nconst piezas_rechazadas = ctx.get('piezas_rechazadas') || 0;\nconst ciclos = ctx.get('ciclos_tiempos') || [];\nconst tiempo_ciclo_s          = ciclos.length > 0 ? ciclos[ciclos.length - 1] : 0;\nconst tiempo_ciclo_promedio_s = ciclos.length > 0 ? ciclos.reduce((a,b) => a+b,0) / ciclos.length : 0;\nconst oee = piezas_procesadas > 0 ? (piezas_aprobadas / piezas_procesadas) * 100 : 0;\n\n// Output 1: señales rápidas (publicar cada ciclo)\nconst msgFast = { payload: {\n    killswitch:     killswitch,\n    modo_auto:      modo_auto,\n    emergencia:     !killswitch,\n    cobot_activo:   cobot_activo,\n    boton_verde:    boton_verde,\n    estampado_up:   d.C2_Estampado_Up    || false,\n    estampado_down: estampado_down,\n    bandas: {\n        banda1:   d.C2_Banda_1        || false,\n        banda2:   d.C2_Banda_2        || false,\n        banda3:   d.C2_Banda_3        || false,\n        banda4:   d.C2_Banda_4        || false,\n        enfrente: d.C2_Banda_Enfrente || false,\n        atras:    d.C2_Bandas_Atras   || false\n    },\n    estaciones: {\n        taladro1:  d.C2_Taladro_1  || false,\n        taladro2:  d.C2_Taladro_2  || false,\n        martillo1: d.C2_Martillo_1 || false,\n        martillo2: d.C2_Martillo_2 || false\n    },\n    cognex: {\n        foto:      cognex_in,\n        aprobada:  aprobada,\n        rechazada: d.Pieza_rechazada || false\n    },\n    semaforo: {\n        verde:        d.C2_Verde_Celda  || false,\n        rojo:         d.C2_Rojo_Celda   || false,\n        azul:         d.C2_Azul_Celda   || false,\n        cuadro_verde: d.C2_Cuadro_Verde || false,\n        cuadro_rojo:  d.C2_Cuadro_Rojo  || false\n    },\n    ts: new Date().toISOString()\n}};\n\n// Output 2: KPIs — solo si cambiaron los contadores\nconst kpiStr = JSON.stringify({ piezas_procesadas, piezas_aprobadas, piezas_rechazadas });\nconst lastKpiStr = ctx.get('lastKpiStr') || '';\nlet msgKpis = null;\nif (kpiStr !== lastKpiStr) {\n    ctx.set('lastKpiStr', kpiStr);\n    msgKpis = { payload: {\n        kpis: {\n            piezas_procesadas:       piezas_procesadas,\n            piezas_aprobadas:        piezas_aprobadas,\n            piezas_rechazadas:       piezas_rechazadas,\n            tiempo_ciclo_s:          Math.round(tiempo_ciclo_s * 10) / 10,\n            tiempo_ciclo_promedio_s: Math.round(tiempo_ciclo_promedio_s * 10) / 10,\n            oee:                     Math.round(oee * 10) / 10\n        },\n        ts: new Date().toISOString()\n    }};\n}\n\nreturn [msgFast, msgKpis];",
+    "outputs": 2,
+    "x": 380,
+    "y": 100,
+    "wires": [
+      [
+        "mqtt-out-celda",
+        "influx-out-celda",
+        "debug-plc-raw"
+      ],
+      [
+        "mqtt-out-kpis"
+      ]
+    ]
+  },
+  {
+    "id": "texto-estado-celda",
+    "type": "ui_text",
+    "z": "tab-celda3105",
+    "group": "ui-group-celda-estado",
+    "order": 1,
+    "width": "6",
+    "height": "1",
+    "name": "Estado Celda",
+    "label": "Estado General",
+    "format": "{{msg.estadoCelda.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 680,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "texto-disponible",
+    "type": "ui_text",
+    "z": "tab-celda3105",
+    "group": "ui-group-celda-estado",
+    "order": 2,
+    "width": "6",
+    "height": "1",
+    "name": "Disponibilidad",
+    "label": "Disponibilidad",
+    "format": "{{msg.disponible.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 680,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "texto-tracking",
+    "type": "ui_text",
+    "z": "tab-celda3105",
+    "group": "ui-group-celda-estado",
+    "order": 3,
+    "width": "6",
+    "height": "1",
+    "name": "Tracking Pieza",
+    "label": "Posición Pieza",
+    "format": "{{msg.tracking.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 680,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "texto-bandas",
+    "type": "ui_text",
+    "z": "tab-celda3105",
+    "group": "ui-group-celda-estado",
+    "order": 4,
+    "width": "6",
+    "height": "1",
+    "name": "Bandas",
+    "label": "Bandas Activas",
+    "format": "{{msg.bandasActivas.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 680,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "texto-estaciones",
+    "type": "ui_text",
+    "z": "tab-celda3105",
+    "group": "ui-group-celda-estaciones",
+    "order": 1,
+    "width": "6",
+    "height": "1",
+    "name": "Estaciones Activas",
+    "label": "Operaciones en curso",
+    "format": "{{msg.estaciones.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "x": 680,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "mqtt-out-celda",
+    "type": "mqtt out",
+    "z": "tab-celda3105",
+    "name": "MQTT → celda3105/plc/fast",
+    "topic": "celda3105/plc/fast",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt-broker-config",
+    "x": 700,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "influx-out-celda",
+    "type": "function",
+    "z": "tab-celda3105",
+    "name": "celda3105_estado → InfluxDB",
+    "func": "const d = msg.payload;\nconst ctx = context.global;\nconst now = Date.now();\n\n// Escribir solo si hubo cambio O cada 10 segundos\nconst lastWrite = ctx.get('lastInfluxWriteCelda') || 0;\nconst lastHash  = ctx.get('lastStateHashCelda')   || '';\nconst stateHash = JSON.stringify({\n    kill: d.killswitch, auto: d.modo_auto, cobot: d.cobot_activo,\n    e_down: d.estampado_down, e_up: d.estampado_up,\n    piezas: d.kpis.piezas_procesadas\n});\n\nif ((now - lastWrite < 10000) && stateHash === lastHash) return null;\nctx.set('lastInfluxWriteCelda', now);\nctx.set('lastStateHashCelda', stateHash);\n\nconst k = d.kpis;\nconst b = (v) => v ? 1 : 0;\n\nconst fields = [\n    `killswitch=${b(d.killswitch)}i`,\n    `modo_auto=${b(d.modo_auto)}i`,\n    `emergencia=${b(d.emergencia)}i`,\n    `cobot_activo=${b(d.cobot_activo)}i`,\n    `estampado_up=${b(d.estampado_up)}i`,\n    `estampado_down=${b(d.estampado_down)}i`,\n    `banda1=${b(d.bandas.banda1)}i`,\n    `banda2=${b(d.bandas.banda2)}i`,\n    `banda3=${b(d.bandas.banda3)}i`,\n    `banda4=${b(d.bandas.banda4)}i`,\n    `banda_enfrente=${b(d.bandas.enfrente)}i`,\n    `bandas_atras=${b(d.bandas.atras)}i`,\n    `taladro1=${b(d.estaciones.taladro1)}i`,\n    `taladro2=${b(d.estaciones.taladro2)}i`,\n    `martillo1=${b(d.estaciones.martillo1)}i`,\n    `martillo2=${b(d.estaciones.martillo2)}i`,\n    `cognex_foto=${b(d.cognex.foto)}i`,\n    `cognex_aprobada=${b(d.cognex.aprobada)}i`,\n    `pieza_rechazada=${b(d.cognex.rechazada)}i`,\n    `semaforo_verde=${b(d.semaforo.verde)}i`,\n    `semaforo_rojo=${b(d.semaforo.rojo)}i`,\n    `semaforo_azul=${b(d.semaforo.azul)}i`,\n    `piezas_procesadas=${k.piezas_procesadas}i`,\n    `piezas_aprobadas=${k.piezas_aprobadas}i`,\n    `piezas_rechazadas=${k.piezas_rechazadas}i`,\n    `tiempo_ciclo_s=${k.tiempo_ciclo_s}`,\n    `tiempo_ciclo_promedio_s=${k.tiempo_ciclo_promedio_s}`,\n    `oee=${k.oee}`\n].join(',');\n\nmsg.payload = `celda3105_estado,planta=celda3105 ${fields} ${now}`;\nmsg.headers = { 'Content-Type': 'text/plain; charset=utf-8' };\nreturn msg;",
+    "outputs": 1,
+    "x": 700,
+    "y": 340,
+    "wires": [
+      [
+        "http-influx-celda"
+      ]
+    ]
+  },
+  {
+    "id": "http-influx-celda",
+    "type": "http request",
+    "z": "tab-celda3105",
+    "name": "Guardar en InfluxDB",
+    "method": "POST",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "http://localhost:8086/api/v2/write?org=smart-manufacturing&bucket=sensor-data&precision=ms",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "bearer",
+    "x": 960,
+    "y": 340,
+    "wires": [
+      [
+        "debug-influx-celda"
+      ]
+    ]
+  },
+  {
+    "id": "debug-influx-celda",
+    "type": "debug",
+    "z": "tab-celda3105",
+    "name": "InfluxDB response",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1180,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "ui-group-rfid",
+    "type": "ui_group",
+    "name": "RFID — Escaneo de Piezas",
+    "tab": "ui-tab-main",
+    "order": 10,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "mqtt-in-rfid",
+    "type": "mqtt in",
+    "z": "tab-smfg",
+    "name": "MQTT — RFID",
+    "topic": "cima/rfid/scan",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "mqtt-broker-config",
+    "x": 130,
+    "y": 560,
+    "wires": [
+      [
+        "fn-rfid-presente"
+      ]
+    ]
+  },
+  {
+    "id": "fn-rfid-presente",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "RFID Presente",
+    "func": "const d = msg.payload;\nconst uid = d.uid || 'DESCONOCIDO';\nconst ts  = Date.now();\n\n// InfluxDB line protocol\nmsg.payload = `rfid_status,machine_id=torno uid=\"${uid}\",presente=1i ${ts}`;\nmsg.headers = { 'Authorization': 'Token VUtAf2OpjMfKRE4GVoUSLJPb8ycDM0ZSKZBsnVnJbgV3EndsYcpB-8ZgVGTI6LC9lPagvU-8SJA-HKGTKnBGOg==',\n                'Content-Type': 'text/plain; charset=utf-8' };\n// UI\nmsg.uid_display = { payload: `🟢  ${uid}` };\nmsg.hora = { payload: new Date().toISOString().substring(11,19) };\nreturn msg;",
+    "outputs": 1,
+    "x": 330,
+    "y": 560,
+    "wires": [
+      [
+        "http-rfid-write",
+        "trig-rfid-ausente",
+        "ui-text-rfid-uid",
+        "ui-text-rfid-hora"
+      ]
+    ]
+  },
+  {
+    "id": "http-rfid-write",
+    "type": "http request",
+    "z": "tab-smfg",
+    "name": "InfluxDB RFID",
+    "method": "POST",
+    "ret": "txt",
+    "url": "http://localhost:8086/api/v2/write?org=smart-manufacturing&bucket=sensor-data&precision=ms",
+    "authType": "none",
+    "x": 560,
+    "y": 520,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "trig-rfid-ausente",
+    "type": "trigger",
+    "z": "tab-smfg",
+    "name": "Sin tarjeta (5s)",
+    "op1": "",
+    "op1type": "nul",
+    "op2": "ausente",
+    "op2type": "str",
+    "duration": "5",
+    "extend": true,
+    "units": "s",
+    "reset": "",
+    "x": 560,
+    "y": 580,
+    "wires": [
+      [
+        "fn-rfid-ausente"
+      ]
+    ]
+  },
+  {
+    "id": "fn-rfid-ausente",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "RFID Ausente",
+    "func": "const ts = Date.now();\nmsg.payload = `rfid_status,machine_id=torno uid=\"\",presente=0i ${ts}`;\nmsg.headers = { 'Authorization': 'Token VUtAf2OpjMfKRE4GVoUSLJPb8ycDM0ZSKZBsnVnJbgV3EndsYcpB-8ZgVGTI6LC9lPagvU-8SJA-HKGTKnBGOg==',\n                'Content-Type': 'text/plain; charset=utf-8' };\nmsg.uid_display = { payload: '⚪  Sin tarjeta' };\nmsg.hora = { payload: '' };\nreturn msg;",
+    "outputs": 1,
+    "x": 760,
+    "y": 580,
+    "wires": [
+      [
+        "http-rfid-write2",
+        "ui-text-rfid-uid",
+        "ui-text-rfid-hora"
+      ]
+    ]
+  },
+  {
+    "id": "http-rfid-write2",
+    "type": "http request",
+    "z": "tab-smfg",
+    "name": "InfluxDB RFID off",
+    "method": "POST",
+    "ret": "txt",
+    "url": "http://localhost:8086/api/v2/write?org=smart-manufacturing&bucket=sensor-data&precision=ms",
+    "authType": "none",
+    "x": 980,
+    "y": 580,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "ui-text-rfid-uid",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "name": "UID Tarjeta",
+    "label": "Tarjeta",
+    "format": "{{msg.uid_display.payload}}",
+    "group": "ui-group-rfid",
+    "order": 1,
+    "width": "4",
+    "height": "1",
+    "x": 560,
+    "y": 640,
+    "wires": []
+  },
+  {
+    "id": "ui-text-rfid-hora",
+    "type": "ui_text",
+    "z": "tab-smfg",
+    "name": "Hora scan",
+    "label": "Hora",
+    "format": "{{msg.hora.payload}}",
+    "group": "ui-group-rfid",
+    "order": 2,
+    "width": "2",
+    "height": "1",
+    "x": 760,
+    "y": 640,
+    "wires": []
+  },
+  {
+    "id": "fmt-influx-energy",
+    "type": "function",
+    "z": "tab-smfg",
+    "name": "Formatear InfluxDB",
+    "func": "var d = msg.payload;\nvar ts = Date.now();\nvar machine = d.machine_id || \"torno\";\nvar power   = d.power_w    || 0;\nvar irms    = d.irms_a     || 0;\nvar energy  = d.energy_kwh || 0;\nvar simul   = d.simulated   ? \"true\" : \"false\";\nvar cycle   = d.cycle_active ? \"true\" : \"false\";\nmsg.payload = \"cima_energy,machine_id=\" + machine + \" power_w=\" + power + \",irms_a=\" + irms + \",energy_kwh=\" + energy + \",simulated=\" + simul + \",cycle_active=\" + cycle + \" \" + ts;\nmsg.headers = {\"Authorization\": \"Token VUtAf2OpjMfKRE4GVoUSLJPb8ycDM0ZSKZBsnVnJbgV3EndsYcpB-8ZgVGTI6LC9lPagvU-8SJA-HKGTKnBGOg==\", \"Content-Type\": \"text/plain; charset=utf-8\"};\nreturn msg;",
+    "outputs": 1,
+    "x": 700,
+    "y": 200,
+    "wires": [
+      [
+        "http-influx-celda"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt-out-kpis",
+    "type": "mqtt out",
+    "z": "tab-celda3105",
+    "name": "MQTT → celda3105/plc/kpis",
+    "topic": "celda3105/plc/kpis",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt-broker-config",
+    "x": 700,
+    "y": 400,
+    "wires": []
+  }
+]
