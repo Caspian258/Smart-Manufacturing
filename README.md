@@ -21,24 +21,24 @@ Como módulo de innovación se diseñó y construyó un **Cyberdeck industrial**
 
 ## Arquitectura del sistema
 
-\`\`\`
+```
 ESP32-S3 (SCT-013 + RFID RC522)
-        │ MQTT
-        ▼
+        | MQTT
+        v
 Raspberry Pi 5 — Servidor Edge On-Premises
-        ├── Mosquitto (broker MQTT :1883)
-        ├── n8n (flujos MQTT → InfluxDB :5678)
-        ├── InfluxDB 2.7 (base de datos :8086)
-        ├── Node-RED (dashboard SCADA :1880)
-        └── Grafana (análisis histórico :3001)
-        │
-        │ S7 / ISO-on-TCP
-        ▼
+        |-- Mosquitto (broker MQTT :1883)
+        |-- n8n (flujos MQTT -> InfluxDB :5678)
+        |-- InfluxDB 2.7 (base de datos :8086)
+        |-- Node-RED (dashboard SCADA :1880)
+        +-- Grafana (análisis histórico :3001)
+        |
+        | S7 / ISO-on-TCP
+        v
 PLC Siemens S7-1200 (Celda 3105)
-        ├── Cognex In-Sight 2800 (Quality Gate)
-        ├── Cobot UF Lite 6
-        └── HMI local
-\`\`\`
+        |-- Cognex In-Sight 2800 (Quality Gate)
+        |-- Cobot UF Lite 6
+        +-- HMI local
+```
 
 ---
 
@@ -46,7 +46,7 @@ PLC Siemens S7-1200 (Celda 3105)
 
 ### Planta 1 — CIMA
 - ESP32-S3-DevKitC-1
-- Sensor de corriente SCT-013 (30A/1V, salida de voltaje)
+- Sensor de corriente SCT-013-000 (100A/50mA, salida de corriente)
 - Circuito acondicionador LM358
 - Lector RFID RC522
 
@@ -79,28 +79,24 @@ PLC Siemens S7-1200 (Celda 3105)
 
 ## Estructura del repositorio
 
-\`\`\`
-/
-├── app/                        ← Cyberdeck: interfaz PyWebView con RBAC
-│   ├── main.py                 ← Backend API (clase Api, PyWebView)
-│   ├── templates/index.html    ← Frontend (toda la UI visible)
-│   ├── auth.py                 ← Autenticación PIN + bcrypt
-│   ├── db.py                   ← Capa de datos (InfluxDB + SQLite)
-│   ├── config.py               ← Configuración central
-│   └── health_check.py         ← Monitor de servicios del stack
-├── firmware/esp32-s3/          ← Proyecto PlatformIO
-│   ├── src/main.cpp            ← Gateway IoT (SCT-013 + RFID)
-│   ├── include/config.h        ← Pines y parámetros de calibración
-│   └── scripts/inject_env.py   ← Inyección de credenciales desde .env
-├── flows/
-│   ├── n8n/                    ← Flujo MQTT → InfluxDB + alertas
-│   └── nodered/                ← Dashboard SCADA + lectura PLC S7-1200
-├── dashboard/grafana/          ← Dashboards y datasource de Grafana
-├── scripts/
-│   └── setup_rpi5.sh           ← Instalación completa del servidor edge
-├── bitacora/                   ← Log de desarrollo del proyecto
-└── docs/                       ← Documentación técnica adicional
-\`\`\`
+- `app/` — Cyberdeck: interfaz PyWebView con RBAC
+  - `main.py` — Backend API (clase Api, PyWebView)
+  - `templates/index.html` — Frontend (toda la UI visible)
+  - `auth.py` — Autenticación PIN + bcrypt
+  - `db.py` — Capa de datos (InfluxDB + SQLite)
+  - `config.py` — Configuración central
+  - `health_check.py` — Monitor de servicios del stack
+- `firmware/esp32-s3/` — Proyecto PlatformIO
+  - `src/main.cpp` — Gateway IoT (SCT-013 + RFID)
+  - `include/config.h` — Pines y parámetros de calibración
+  - `scripts/inject_env.py` — Inyección de credenciales desde .env
+- `flows/`
+  - `n8n/` — Flujo MQTT → InfluxDB + alertas
+  - `nodered/` — Dashboard SCADA + lectura PLC S7-1200
+- `dashboard/grafana/` — Dashboards y datasource de Grafana
+- `scripts/setup_rpi5.sh` — Instalación completa del servidor edge
+- `bitacora/` — Log de desarrollo del proyecto
+- `docs/` — Documentación técnica adicional
 
 > **Nota:** Los programas de TIA Portal (PLC), Cognex In-Sight y Cobot UF Lite 6 se agregarán próximamente.
 
@@ -110,35 +106,35 @@ PLC Siemens S7-1200 (Celda 3105)
 
 ### 1. Configurar el servidor edge (Raspberry Pi 5)
 
-\`\`\`bash
+```bash
 git clone https://github.com/Caspian258/Smart-Manufacturing.git /opt/smart-manufacturing
 cd /opt/smart-manufacturing
 sudo bash scripts/setup_rpi5.sh
-\`\`\`
+```
 
 El script instala y configura automáticamente: Mosquitto, InfluxDB, Node-RED, n8n y Grafana.
 
 ### 2. Configurar el firmware del ESP32-S3
 
-\`\`\`bash
+```bash
 cd firmware/esp32-s3
 cp .env.template .env
 # Editar .env con las credenciales WiFi e IP del RPi5
 pio run --target upload
-\`\`\`
+```
 
 ### 3. Importar flujos
 
-- **n8n:** importar \`flows/n8n/mqtt_to_influxdb_v2.json\` en \`http://IP_RPI5:5678\`
-- **Node-RED:** importar \`flows/nodered/nodered_dashboard.json\` en \`http://IP_RPI5:1880\`
+- **n8n:** importar `flows/n8n/mqtt_to_influxdb_v2.json` en `http://IP_RPI5:5678`
+- **Node-RED:** importar `flows/nodered/nodered_dashboard.json` en `http://IP_RPI5:1880`
 
 ### 4. Iniciar el Cyberdeck
 
-\`\`\`bash
+```bash
 cd /opt/smart-manufacturing
 source venv/bin/activate
 python3 app/main.py
-\`\`\`
+```
 
 ---
 
@@ -167,6 +163,6 @@ python3 app/main.py
 
 ## Proyecto académico
 
-**Institución:** Tecnológico de Monterrey, Querétaro
-**Colaboradores:** Rockwell Automation · Siemens · Cognex
+**Institución:** Tecnológico de Monterrey, Querétaro  
+**Colaboradores:** Rockwell Automation · Siemens · Cognex  
 **Equipo:** UNIX & Co.
