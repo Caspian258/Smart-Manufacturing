@@ -165,4 +165,4 @@ python3 app/main.py
 
 **Institución:** Tecnológico de Monterrey, Querétaro  
 **Colaboradores:** Rockwell Automation · Siemens · Cognex  
-**Equipo:** UNIX & Co.
+**Equipo:** UNIX
