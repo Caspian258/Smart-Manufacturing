@@ -637,6 +637,12 @@
           </div>
         </div>
 
+        <!-- Banner ESP32 offline -->
+        <div id="banner-esp32-offline" class="cycle-banner" style="display:none;background:var(--danger-bg);color:var(--danger-text);border:0.5px solid var(--danger-text);">
+          <i class="ti ti-wifi-off"></i>
+          ESP32 desconectado — datos no disponibles
+        </div>
+
         <div class="kpi-grid">
           <div class="kpi-card">
             <div class="kpi-label"><i class="ti ti-bolt"></i>Potencia</div>
@@ -646,7 +652,7 @@
           <div class="kpi-card">
             <div class="kpi-label"><i class="ti ti-current-ac"></i>Corriente</div>
             <div class="kpi-value"><span id="kpi-irms">0.00</span> <span class="kpi-unit">A</span></div>
-            <div class="kpi-sub muted">SCT-013 real</div>
+            <div class="kpi-sub muted" id="kpi-irms-sub">SCT-013 real</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label"><i class="ti ti-clock"></i>Energía hoy</div>
@@ -1522,15 +1528,42 @@ async function pollData() {
   try {
     const d = await window.pywebview.api.get_current_power();
     if (!d || d.error) return;
-    const pw = Math.round(d.power_w || 0);
-    setEl('kpi-power', pw);
-    setEl('kpi-irms',  (d.irms_a || 0).toFixed(2));
-    setEl('kpi-power-sub', pw > 10 ? '↑ activo' : '— sin carga');
+    const online = !!d.esp32_online;
+
+    if (online) {
+      const pw = Math.round(d.power_w || 0);
+      setEl('kpi-power',     pw);
+      setEl('kpi-irms',      (d.irms_a || 0).toFixed(2));
+      setEl('kpi-power-sub', pw > 10 ? '↑ activo' : '— sin carga');
+      setEl('kpi-irms-sub',  'SCT-013 real');
+      pushPower(pw);
+    } else {
+      setEl('kpi-power',     '—');
+      setEl('kpi-irms',      '—');
+      setEl('kpi-power-sub', '');
+      setEl('kpi-irms-sub',  'sin señal');
+      pushPower(0);
+    }
+
     if (d.energy_kwh !== undefined) setEl('kpi-energy', d.energy_kwh.toFixed(3));
-    const esp32ok = (d.irms_a || 0) > 0.01;
-    ['badge-esp32','badge-esp32-dash','st-esp32'].forEach(id =>
-      applyBadge(document.getElementById(id), esp32ok ? 'ok' : 'warn'));
-    pushPower(pw);
+
+    // Badges ESP32 — texto y color según estado
+    const espBadgeText = {
+      'badge-esp32':      online ? 'ESP32 REAL'   : 'ESP32 OFFLINE',
+      'badge-esp32-dash': online ? 'ESP32 online'  : 'ESP32 OFFLINE',
+      'st-esp32':         online ? 'REAL'          : 'OFFLINE',
+    };
+    Object.entries(espBadgeText).forEach(([id, txt]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      applyBadge(el, online ? 'ok' : 'err');
+      el.innerHTML = `<span class="badge-dot"></span>${txt}`;
+    });
+
+    // Banner ESP32 offline
+    const banner = document.getElementById('banner-esp32-offline');
+    if (banner) banner.style.display = online ? 'none' : 'flex';
+
   } catch(e) {}
 
   try {
