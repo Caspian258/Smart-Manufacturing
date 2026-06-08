@@ -14,9 +14,11 @@
 
 static MFRC522 rfid_test(PIN_RFID_SS, PIN_RFID_RST);
 
+static int s_test_offset = 0;
+
 static float readIrms() {
   int64_t sumSq = 0;
-  const int offset = 2048;
+  const int offset = s_test_offset;
   for (int n = 0; n < 1480; n++) {
     int raw = analogRead(PIN_SCT) - offset;
     sumSq += (int64_t)raw * raw;
@@ -48,6 +50,14 @@ void setup() {
     Serial.printf("[RC522] OK — versión: 0x%02X\n", ver);
   } else {
     Serial.printf("[RC522] ADVERTENCIA — respuesta inesperada: 0x%02X (revisar cableado)\n", ver);
+  }
+  // Calibrar DC offset dinámicamente (igual que main.cpp)
+  {
+    int32_t s = 0;
+    for (int i = 0; i < 1000; i++) { s += analogRead(PIN_SCT); delayMicroseconds(100); }
+    s_test_offset = s / 1000;
+    if (s_test_offset > 300) s_test_offset = 0;
+    Serial.printf("[SCT] DC offset calibrado: %d\n", s_test_offset);
   }
   Serial.println("[SCT-013] Leyendo cada 2s — acerca un cable con corriente al sensor");
   Serial.println("─────────────────────────────────────────\n");
