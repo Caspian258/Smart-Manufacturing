@@ -92,9 +92,6 @@ PowerReading measurePower() {
   float vrms = (N > 0) ? sqrtf(2.0f * sumSq / N) : 0.0f;
 
   // Paso 4 — Conversión V → A (SCT-013 30A/1V: salida de voltaje)
-  Serial.printf("[DEBUG SCT] N=%d sumSq=%.4f vrms=%.6f irms_raw=%.4f\n",
-                N, sumSq, (N>0)?sqrtf(2.0f*sumSq/N):0.0f,
-                (N>0)?sqrtf(2.0f*sumSq/N)*SCT_RATIO*SCT_CALIBRATION:0.0f);
   float irms = vrms * SCT_RATIO * SCT_CALIBRATION;
 
   // Paso 5 — Umbral de ruido y potencia

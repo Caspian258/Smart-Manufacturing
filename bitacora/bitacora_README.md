@@ -1397,6 +1397,26 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
 
 ---
 
+## ENTRADA #080 — Calibración empírica SCT-013-030 con torno ROMI
+- **Fecha:** 2026-06-08 
+- **Acción:** Actualizar SCT_CALIBRATION con factor empírico medido con torno
+- **Detalles:**
+  1. Medición con pinza amperimétrica sobre torno ROMI: 6.80A real
+  2. ESP32 reportaba: 5.10A → factor de corrección: 6.80/5.10 = 1.333
+  3. `config.h`: SCT_CALIBRATION actualizado de 1.0f → 1.333f con comentario empírico
+  4. `main.cpp`: eliminado bloque [DEBUG SCT] (Serial.printf de vrms/irms_raw)
+  5. Firmware compiló correctamente (Flash 28.6%, RAM 15.4%)
+  6. ⚠️ Flash pendiente: ESP32-S3 no conectado por USB al momento del upload
+     (`/dev/ttyAMA10` detectado pero sin datos — reconectar USB y re-flashear)
+- **Archivos modificados:**
+  - `firmware/esp32-s3/include/config.h`
+  - `firmware/esp32-s3/src/main.cpp`
+- **Estado:** 🔄 Código listo — flash pendiente (reconectar USB del ESP32)
+- **Próximo paso:** Conectar ESP32-S3 por USB y correr `pio run -e debug --target upload`
+  Verificar serial: torno debe reportar ~6.80A en línea `[ENERGY]`
+
+---
+
 ## PENDIENTES INMEDIATOS ← PRÓXIMA SESIÓN
 - [ ] **BUG** — Limpiar datos viejos InfluxDB `celda3105_plc` (posicion=7 persistente)
 - [ ] Verificar orden físico Led_6 (I8.1) vs Led_7 (I8.0) en línea de producción

@@ -30,7 +30,7 @@
 
 // SCT-013-030 (30A/1V) — salida de voltaje, burden interno, compatible con circuito LM358 existente
 #define SCT_RATIO        30.0f  // 30A por cada 1V de salida
-#define SCT_CALIBRATION     1.0f    // Empírico: recalibrar con pinza amperimétrica tras instalar SCT-013-030
+#define SCT_CALIBRATION     1.333f  // Empírico: torno ROMI — pinza=6.80A ESP32=5.10A → factor=1.333
 #define SCT_SAMPLE_MS       500
 #define SCT_MIN_CURRENT     0.30f   // Umbral ruido ADC: cargas reales > 0.30A (~66W a 220V)
                                     // Foco 40W = 0.18A → no medible (por debajo del umbral)
