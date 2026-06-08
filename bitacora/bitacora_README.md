@@ -1372,6 +1372,31 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
 
 ---
 
+## ENTRADA #079 — Calibración SCT-013-030 y verificación sistema completo
+- **Fecha:** 2026-06-08
+- **Actividades realizadas:**
+  1. Diagnóstico de MQTT rc=-2: IP dinámica de RPi5 cambió de
+     10.25.46.72 → 10.25.15.234. Actualizado .env sin commit.
+  2. Diagnóstico de señal SCT-013-030: lecturas infladas (~19.9A
+     con foco) por alimentación incorrecta — sensor conectado a 5V
+     en lugar de 3.3V.
+  3. Corrección hardware: SCT-013-030 reconectado a 3.3V.
+  4. Verificación post-corrección: foco 40W a 220V reporta 0.182A
+     (teórico: 40/220 = 0.182A). SCT_CALIBRATION=1.0f es exacto,
+     no requiere ajuste empírico.
+  5. App Cyberdeck verificada: ESP32 online, datos en tiempo real,
+     indicadores correctos.
+- **Resultado:** Sistema completamente operativo
+  - SCT-013-030 a 3.3V + SCT_CALIBRATION=1.0f → calibración exacta
+  - MQTT TLS funcionando en red Tec-IoT
+  - RFID RC522 leyendo tarjetas correctamente
+  - App mostrando datos en tiempo real sin valores fantasma
+- **Pendiente:** IP de RPi5 en Tec-IoT es dinámica — solicitar
+  reserva DHCP al equipo de TI del Tec para wlan0
+- **Estado:** ✅ Operativo
+
+---
+
 ## PENDIENTES INMEDIATOS ← PRÓXIMA SESIÓN
 - [ ] **BUG** — Limpiar datos viejos InfluxDB `celda3105_plc` (posicion=7 persistente)
 - [ ] Verificar orden físico Led_6 (I8.1) vs Led_7 (I8.0) en línea de producción
