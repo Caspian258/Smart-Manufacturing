@@ -1340,6 +1340,38 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
 
 ---
 
+## ENTRADA #077 — Migración al repo limpio Smart-Manufacturing
+- **Fecha**: 2026-06-08 13:55
+- **Acción**: Clonar repo nuevo `Caspian258/Smart-Manufacturing` en `/home/caspian/Proyectos/Smart-Manufacturing/`. Verificar servicios systemd (sin referencias al repo viejo). Reiniciar stack: mosquitto ✅, influxdb ✅, nodered ✅. n8n corre como Docker (Up 45h, no requirió acción).
+- **Estado**: ✅ Completado
+- **Archivos modificados**: ninguno (operación de migración de infraestructura)
+- **Notas**: Repo viejo `Smart-Manufacturing-Project` no existe en `/home/caspian/Proyectos/` — los `.env` deben copiarse manualmente desde la fuente real (laptop o backup externo).
+- **Próximo paso**: Copiar `.env` de firmware y app al repo nuevo cuando el usuario tenga acceso a la fuente de credenciales
+
+---
+
+## ENTRADA #078 — Sustitución sensor SCT-013 y corrección pines RFID
+- **Fecha:** 2026-06-08
+- **Problema:** Sensor SCT-013-000 (salida de corriente, 100A/50mA) era
+  incompatible con el circuito acondicionador Naylamp diseñado para salida
+  de voltaje. Sin resistencia de carga Rb, el LM358 saturaba y el ADC
+  reportaba valor fijo sin importar la carga. Adicionalmente, pines MOSI/MISO
+  del RC522 estaban intercambiados en config.h.
+- **Solución:**
+  - Sensor reemplazado por SCT-013-030 (30A/1V, salida de voltaje, burden
+    interno) — compatible directamente con circuito LM358 existente sin Rb
+  - SCT_CALIBRATION corregido de 0.0938f → 1.0f (requiere recalibración
+    empírica con pinza amperimétrica)
+  - PIN_SPI_MOSI corregido: 11 → 13
+  - PIN_SPI_MISO corregido: 13 → 11
+  - sensor_test.cpp: offset fijo 2048 → calibración dinámica consistente
+    con main.cpp
+- **Pendiente:** Recalibrar SCT_CALIBRATION con pinza amperimétrica con
+  torno encendido
+- **Estado:** ⚠️ Pendiente calibración empírica
+
+---
+
 ## PENDIENTES INMEDIATOS ← PRÓXIMA SESIÓN
 - [ ] **BUG** — Limpiar datos viejos InfluxDB `celda3105_plc` (posicion=7 persistente)
 - [ ] Verificar orden físico Led_6 (I8.1) vs Led_7 (I8.0) en línea de producción
