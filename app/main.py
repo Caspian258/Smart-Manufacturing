@@ -81,6 +81,10 @@ class Api:
         self._rfid_sim_active: bool = False
         self._rfid_sim_part: str | None = None
         self._rfid_sim_start: float = 0.0
+        self._energy_latest: dict = {}
+        self._energy_ts: float | None = None
+        self._energy_mqtt: mqtt_lib.Client | None = None
+        self._connect_energy_mqtt()
 
     def _connect_rfid_mqtt(self):
         try:
@@ -106,6 +110,30 @@ class Api:
                 self._active_cycle = {**payload, "_epoch": time.time()}
             elif event == "stop":
                 self._active_cycle = None
+        except Exception:
+            pass
+
+    def _connect_energy_mqtt(self):
+        try:
+            energy_topic = f"cima/machines/{MACHINE_ID_PLANTA1}/energy"
+            try:
+                client = mqtt_lib.Client(mqtt_lib.CallbackAPIVersion.VERSION2)
+                client.on_connect = lambda c, u, f, rc, p: c.subscribe(energy_topic) if rc == 0 else None
+            except AttributeError:
+                client = mqtt_lib.Client()
+                client.on_connect = lambda c, u, f, rc: c.subscribe(energy_topic) if rc == 0 else None
+            client.username_pw_set(MQTT_APP_USER, MQTT_APP_PASS)
+            client.on_message = self._on_energy_message
+            client.connect_async(MQTT_BROKER, MQTT_PORT_LOCAL, 60)
+            client.loop_start()
+            self._energy_mqtt = client
+        except Exception as exc:
+            log.warning("Api Energy MQTT: %s", exc)
+
+    def _on_energy_message(self, client, userdata, msg):
+        try:
+            self._energy_latest = json.loads(msg.payload.decode())
+            self._energy_ts = time.time()
         except Exception:
             pass
 
@@ -189,28 +217,25 @@ class Api:
             return {"error": "not_authenticated"}
         if self._session.get("rol") not in ("planta1", "admin"):
             return {"error": "forbidden"}
-        _ZERO = {"power_w": 0.0, "irms_a": 0.0, "energy_kwh": 0.0}
-        data = query_energy_24h(machine_id=MACHINE_ID_PLANTA1)
-        if not data:
-            return _ZERO
-        latest     = data[-1]
-        # Si el último dato de InfluxDB tiene más de 10 segundos, el ESP32
-        # está desconectado o apagado — devolver ceros en lugar de dato obsoleto.
-        try:
-            from datetime import datetime, timezone
-            ts_str = latest.get("time", "")
-            if ts_str:
-                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                age_s = (datetime.now(timezone.utc) - ts).total_seconds()
-                if age_s > 10:
-                    return _ZERO
-        except Exception:
-            pass
-        energy_kwh = round(sum(d["energy_kwh"] for d in data), 3)
+        # ESP32 publica cada 5s; si no llega dato MQTT en 15s está desconectado.
+        _STALE_S = 15
+        online = bool(self._energy_ts and (time.time() - self._energy_ts) <= _STALE_S)
+        if not online:
+            return {
+                "power_w":      0.0,
+                "irms_a":       0.0,
+                "energy_kwh":   0.0,
+                "cycle_active": False,
+                "esp32_online": False,
+            }
+        data       = query_energy_24h(machine_id=MACHINE_ID_PLANTA1)
+        energy_kwh = round(sum(d["energy_kwh"] for d in data), 3) if data else 0.0
         return {
-            "power_w":    latest["power_w"],
-            "irms_a":     latest["irms_a"],
-            "energy_kwh": energy_kwh,
+            "power_w":      float(self._energy_latest.get("power_w",  0.0)),
+            "irms_a":       float(self._energy_latest.get("irms_a",   0.0)),
+            "energy_kwh":   energy_kwh,
+            "cycle_active": bool(self._energy_latest.get("cycle_active", False)),
+            "esp32_online": True,
         }
 
     def get_energy_realtime(self) -> list:
@@ -575,12 +600,13 @@ class Api:
 
     def stop(self) -> None:
         self._hc.stop()
-        if self._rfid_mqtt:
-            try:
-                self._rfid_mqtt.loop_stop()
-                self._rfid_mqtt.disconnect()
-            except Exception:
-                pass
+        for client in (self._rfid_mqtt, self._energy_mqtt):
+            if client:
+                try:
+                    client.loop_stop()
+                    client.disconnect()
+                except Exception:
+                    pass
 
 
 def _detect_screen() -> tuple[int, int]:
