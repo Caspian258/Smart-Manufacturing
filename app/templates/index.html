@@ -89,23 +89,31 @@
   }
   .login-btn:hover { background: var(--accent-dark); }
   .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  /* ── LOGIN TWO-COLUMN ── */
-  .login-wrapper { display: flex; align-items: center; gap: 0; }
-  .login-fp-divider {
-    display: none; flex-direction: column; align-items: center;
-    gap: 8px; padding: 0 20px; color: var(--text-hint);
+  /* ── LOGIN STEPS ── */
+  #login-step1, #login-step2 {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute; inset: 0;
   }
-  .login-divider-line { width: 1px; height: 56px; background: var(--border-md); }
-  .login-divider-text { font-size: 11px; color: var(--text-hint); }
-  .login-fp-section {
-    display: none; flex-direction: column; align-items: center;
-    justify-content: center; gap: 14px;
-    padding: 2rem 1.5rem; width: 200px;
+  .login-fp-card {
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 14px;
   }
-  .fp-section-title {
-    font-size: 12px; font-weight: 600; letter-spacing: .04em;
-    color: var(--text-secondary); text-transform: uppercase;
+  .fp-confirm-user {
+    font-size: 20px; font-weight: 700; color: var(--accent);
+    letter-spacing: .02em;
   }
+  .fp-attempts {
+    font-size: 11px; color: var(--text-hint); min-height: 16px;
+  }
+  .login-btn-cancel {
+    width: 100%; padding: 8px; margin-top: 4px;
+    background: transparent; border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    font-size: 13px; color: var(--text-secondary); cursor: pointer;
+    transition: background .15s;
+  }
+  .login-btn-cancel:hover { background: var(--bg); }
   /* Fingerprint icon circle */
   .fp-icon-wrap {
     width: 80px; height: 80px; border-radius: 50%;
@@ -131,17 +139,10 @@
   .fp-icon-wrap.fp-error i { color: var(--danger-text); }
   .fp-label {
     font-size: 12px; color: var(--text-secondary);
-    text-align: center; max-width: 160px; min-height: 32px;
+    text-align: center; max-width: 220px; min-height: 32px;
     transition: color .3s;
   }
   .fp-label.fp-label-error { color: var(--danger-text); }
-  /* Responsive: stack vertically on narrow screens */
-  @media (max-width: 640px) {
-    .login-wrapper { flex-direction: column; gap: 0; }
-    .login-fp-divider { flex-direction: row !important; width: 100%; padding: 12px 0; }
-    .login-divider-line { width: 56px !important; height: 1px !important; }
-    .login-fp-section { width: 100%; padding: 1.2rem 1.5rem; }
-  }
   .login-error {
     font-size: 12px; color: var(--danger-text);
     background: var(--danger-bg);
@@ -588,9 +589,9 @@
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <div class="login-wrapper">
 
-    <!-- ── PIN ── -->
+  <!-- ── Paso 1: Usuario + PIN ── -->
+  <div id="login-step1">
     <div class="login-card">
       <div class="login-logo">
         <div class="login-logo-icon"><i class="ti ti-bolt"></i></div>
@@ -605,24 +606,22 @@
       <button class="login-btn" id="login-btn" onclick="doLogin()">Ingresar</button>
       <div class="login-error" id="login-error">Usuario o PIN incorrecto</div>
     </div>
+  </div>
 
-    <!-- ── Divisor (visible solo si hay huella) ── -->
-    <div class="login-fp-divider" id="login-fp-divider">
-      <div class="login-divider-line"></div>
-      <span class="login-divider-text">o</span>
-      <div class="login-divider-line"></div>
-    </div>
-
-    <!-- ── Huella dactilar (visible solo si fingerprint_enabled) ── -->
-    <div class="login-fp-section" id="login-fp-section">
-      <p class="fp-section-title">Huella dactilar</p>
+  <!-- ── Paso 2: Confirmación por huella ── -->
+  <div id="login-step2" style="display:none">
+    <div class="login-card login-fp-card">
+      <p class="login-subtitle">Confirma tu identidad</p>
+      <p class="fp-confirm-user" id="fp-confirm-user"></p>
       <div class="fp-icon-wrap fp-waiting" id="fp-icon-wrap">
         <i class="ti ti-fingerprint" id="fp-icon"></i>
       </div>
-      <p class="fp-label" id="fp-label">Coloca tu dedo<br>en el sensor</p>
+      <p class="fp-label" id="fp-label">Coloca tu dedo en el sensor</p>
+      <p class="fp-attempts" id="fp-attempts"></p>
+      <button class="login-btn-cancel" onclick="cancelStep2()">← Cancelar</button>
     </div>
-
   </div>
+
 </div>
 
 <!-- APP -->
@@ -1416,19 +1415,11 @@ async function loadRFIDCycles() {
 }
 
 // ── pywebview handshake ───────────────────────────────────────────────────────
+let appConfig = {};
 window.addEventListener('pywebviewready', async () => {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
-  try {
-    const cfg = await window.pywebview.api.get_config();
-    if (cfg && cfg.fingerprint_enabled) {
-      const div = document.getElementById('login-fp-divider');
-      const sec = document.getElementById('login-fp-section');
-      if (div) div.style.display = 'flex';
-      if (sec) sec.style.display = 'flex';
-      startFingerprintPolling();
-    }
-  } catch(e) {}
+  try { appConfig = await window.pywebview.api.get_config() || {}; } catch(e) {}
 });
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('login-btn');
@@ -1509,6 +1500,36 @@ function pushPower(value) {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
+// Login state
+let loginStep   = 1;
+let fpAttempts  = 0;
+let pendingUser = null;   // {username, role} validado en Paso 1
+
+function showStep1() {
+  loginStep   = 1;
+  fpAttempts  = 0;
+  pendingUser = null;
+  stopFingerprintPolling();
+  document.getElementById('login-step1').style.display = 'flex';
+  document.getElementById('login-step2').style.display = 'none';
+  document.getElementById('login-pin').value   = '';
+  document.getElementById('login-error').style.display = 'none';
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+}
+
+function showStep2() {
+  loginStep  = 2;
+  fpAttempts = 0;
+  document.getElementById('login-step1').style.display = 'none';
+  document.getElementById('login-step2').style.display = 'flex';
+  setEl('fp-confirm-user', pendingUser.username);
+  setEl('fp-attempts', 'Intento 1 de 3');
+  startFingerprintPolling();
+}
+
+function cancelStep2() { showStep1(); }
+
 async function doLogin() {
   const user = document.getElementById('login-user').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
@@ -1518,14 +1539,29 @@ async function doLogin() {
   if (!user || !pin) { err.textContent = 'Ingresa usuario y PIN'; err.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Verificando…';
   try {
-    const res = await window.pywebview.api.login(user, pin);
-    if (res && res.success) {
-      _applyLoginSuccess(res, user);
+    if (appConfig.fingerprint_enabled) {
+      // Paso 1 — solo valida credenciales, sin sesión todavía
+      const res = await window.pywebview.api.verify_pin_only(user, pin);
+      if (res && res.ok) {
+        pendingUser = {username: res.username, role: res.role};
+        showStep2();
+      } else {
+        err.textContent = (res && res.message) ? res.message : 'Usuario o PIN incorrecto';
+        err.style.display = 'block';
+        document.getElementById('login-pin').value = '';
+        btn.disabled = false; btn.textContent = 'Ingresar';
+      }
     } else {
-      err.textContent   = (res && res.message) ? res.message : 'Usuario o PIN incorrecto';
-      err.style.display = 'block';
-      document.getElementById('login-pin').value = '';
-      btn.disabled = false; btn.textContent = 'Ingresar';
+      // Sin huella: flujo directo
+      const res = await window.pywebview.api.login(user, pin);
+      if (res && res.success) {
+        _applyLoginSuccess(res, user);
+      } else {
+        err.textContent = (res && res.message) ? res.message : 'Usuario o PIN incorrecto';
+        err.style.display = 'block';
+        document.getElementById('login-pin').value = '';
+        btn.disabled = false; btn.textContent = 'Ingresar';
+      }
     }
   } catch(e) {
     err.textContent = 'Error de conexión con el backend';
@@ -1561,7 +1597,7 @@ function _applyLoginSuccess(res, username) {
   startPolling();
 }
 
-// ── Fingerprint polling ────────────────────────────────────────────────────────
+// ── Fingerprint — Paso 2 ──────────────────────────────────────────────────────
 let fpPollingActive = false;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1573,7 +1609,7 @@ function showFpWaiting() {
   if (!wrap) return;
   wrap.className = 'fp-icon-wrap fp-waiting';
   if (ico) ico.className = 'ti ti-fingerprint';
-  if (lbl) { lbl.className = 'fp-label'; lbl.innerHTML = 'Coloca tu dedo<br>en el sensor'; }
+  if (lbl) { lbl.className = 'fp-label'; lbl.textContent = 'Coloca tu dedo en el sensor'; }
 }
 
 function showFpError(msg) {
@@ -1598,23 +1634,67 @@ function showFpSuccess() {
 
 function stopFingerprintPolling() { fpPollingActive = false; }
 
+async function triggerSelfDestruct() {
+  fpPollingActive = false;
+  document.body.style.background = '#ff4757';
+  document.body.innerHTML = `
+    <div style="
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      height:100vh;background:#ff4757;
+      font-family:monospace;user-select:none;pointer-events:none;">
+      <div style="color:#fff;font-size:clamp(1.2rem,3vw,2.5rem);font-weight:900;
+                  text-align:center;padding:0 2rem;margin-bottom:2rem;">
+        ⚠ ACCESO DENEGADO — Autodestrucción en...
+      </div>
+      <div id="countdown" style="color:#fff;font-size:20vw;font-weight:900;line-height:1;">3</div>
+    </div>`;
+  const cd = document.getElementById('countdown');
+  for (const n of [3, 2, 1, 0]) {
+    if (cd) cd.textContent = n;
+    await sleep(n === 0 ? 500 : 1000);
+  }
+  try { await window.pywebview.api.close_app(); } catch(e) {}
+}
+
 async function startFingerprintPolling() {
   fpPollingActive = true;
   showFpWaiting();
   while (fpPollingActive) {
     try {
-      const d = await window.pywebview.api.fingerprint_login();
+      const d = await window.pywebview.api.fingerprint_scan();
       if (!fpPollingActive) break;
+
       if (d && d.success) {
-        showFpSuccess();
-        await sleep(800);
-        _applyLoginSuccess(d, d.username);
-        return;
+        if (d.username === pendingUser.username) {
+          // ✅ Huella coincide con usuario del Paso 1
+          showFpSuccess();
+          await sleep(800);
+          const sess = await window.pywebview.api.complete_session(pendingUser.username, pendingUser.role);
+          if (sess && sess.success) _applyLoginSuccess(sess, pendingUser.username);
+          return;
+        }
+        // Huella de otro usuario
+        fpAttempts++;
+        setEl('fp-attempts', `Intento ${fpAttempts} de 3`);
+        showFpError(`No corresponde a ${pendingUser.username}`);
+      } else if (d && d.timeout) {
+        // Timeout — no cuenta como intento fallido
+        if (fpPollingActive) showFpWaiting();
+        continue;
+      } else {
+        // Huella no reconocida
+        fpAttempts++;
+        setEl('fp-attempts', `Intento ${fpAttempts} de 3`);
+        showFpError((d && d.message) ? d.message : 'Huella no reconocida');
       }
-      const msg = (d && d.message) ? d.message : 'No detectado';
-      showFpError(msg);
+
       await sleep(1500);
-      if (fpPollingActive) showFpWaiting();
+      if (fpAttempts >= 3) { triggerSelfDestruct(); return; }
+      if (fpPollingActive) {
+        showFpWaiting();
+        setEl('fp-attempts', `Intento ${fpAttempts + 1} de 3`);
+      }
     } catch(e) {
       if (!fpPollingActive) break;
       await sleep(2000);

@@ -213,6 +213,33 @@ class Api:
             return {"success": True, "role": result.rol, "username": result.username}
         return {"success": False, "message": result.message}
 
+    def verify_pin_only(self, username: str, pin: str) -> dict:
+        """Valida usuario + PIN sin crear sesión — Paso 1 del flujo 2FA."""
+        result = authenticate(str(username).strip(), str(pin).strip())
+        if result.ok:
+            return {"ok": True, "username": result.username, "role": result.rol}
+        return {"ok": False, "message": result.message}
+
+    def fingerprint_scan(self) -> dict:
+        """Escanea huella sin crear sesión — Paso 2 del flujo 2FA."""
+        result = authenticate_by_fingerprint()
+        is_timeout = any(w in result.message.lower() for w in ("dedo", "timeout", "sin dedo"))
+        if result.ok:
+            return {"success": True, "username": result.username, "role": result.rol}
+        return {"success": False, "message": result.message, "timeout": is_timeout}
+
+    def complete_session(self, username: str, role: str) -> dict:
+        """Crea la sesión tras validación 2FA exitosa (PIN + huella)."""
+        self._session = {"username": username, "rol": role}
+        log.info("Login 2FA completo: %s (%s)", username, role)
+        return {"success": True, "username": username, "role": role}
+
+    def close_app(self) -> None:
+        """Cierra la ventana PyWebView."""
+        import webview as _wv
+        for win in _wv.windows:
+            win.destroy()
+
     def logout(self) -> dict:
         if self._session:
             log.info("Logout: %s", self._session["username"])
