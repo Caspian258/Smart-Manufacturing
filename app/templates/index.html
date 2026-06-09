@@ -2015,6 +2015,20 @@ async function loadQuality() {
       }
       const noData = document.getElementById('quality-no-data');
       if (noData) noData.style.display = connected ? 'none' : '';
+
+      // Actualizar KPIs de texto (misma fuente que loadCeldaKpis)
+      const inspeccionadas = d.inspeccionadas ?? 0;
+      const total = aprobadas + rechazadas || 1;
+      setEl('q-total',         inspeccionadas);
+      setEl('q-aprobadas',     aprobadas);
+      setEl('q-rechazadas',    rechazadas);
+      setEl('q-rendimiento',   total > 1 ? (aprobadas / total * 100).toFixed(1) : '—');
+      setEl('q-aprobadas-num',  aprobadas  + ' / ' + total);
+      setEl('q-rechazadas-num', rechazadas + ' / ' + total);
+      const barA = document.getElementById('q-aprobadas-bar');
+      const barR = document.getElementById('q-rechazadas-bar');
+      if (barA) barA.style.width = (aprobadas  / total * 100).toFixed(1) + '%';
+      if (barR) barR.style.width = (rechazadas / total * 100).toFixed(1) + '%';
     }
   } catch(e) {}
 
