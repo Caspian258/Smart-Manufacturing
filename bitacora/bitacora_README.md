@@ -1482,6 +1482,18 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
 | 0.3.0 | 2026-03-28 | Stack RPi5 operativo |
 | 0.1.0 | 2026-03-28 | Estructura inicial |
 
+## ENTRADA #082 — Flujo Node-RED: detección de flancos PLC → celda3105_ciclos
+- **Fecha**: 2026-06-09 00:00
+- **Acción**: Agrega sub-flujo de trazabilidad en tab "Celda 3105 — PLC" de Node-RED
+- **Estado**: ✅ Completado — desplegado en Node-RED
+- **Archivos modificados**: flows/nodered/nodered_dashboard.json
+- **Detalles**:
+  - `detectar flancos`: detecta flanco subida de `C2_Boton_Verde` (→ INICIO de ciclo) y `M_Ci3_cobot` (→ FIN de ciclo), con tipo de pieza determinado por `Cognex_out1`.
+  - `gestionar ciclos`: administra cola de hasta 2 ciclos activos; al INICIO genera `cycle_id` único; al FIN calcula `duration_s` y resultado (`aprobado` / `rechazado`).
+  - `→ Line Protocol`: convierte los objetos InfluxDB a Line Protocol y reusa el nodo `http-influx-celda` existente.
+  - Rama paralela desde `plc-poller` (sin tocar flujos CIMA/ESP32). Measurement: `celda3105_ciclos`, tags: `piece_type`, `result`.
+- **Próximo paso**: Verificar datos en InfluxDB con PLC en producción — `celda3105_ciclos` se creará con el primer ciclo real
+
 ## ENTRADA #081 — Trazabilidad por pieza Celda 3105
 - **Fecha**: 2026-06-08 00:00
 - **Acción**: Agrega paneles de trazabilidad en la vista Celda 3105 de la app PyWebView
