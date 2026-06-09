@@ -48,6 +48,8 @@ from db import (
     query_celda3105_latest,
     query_celda3105_kpis,
     query_celda3105_operaciones,
+    query_celda3105_ciclos_activos,
+    query_celda3105_ciclos_historial,
     get_all_users,
     delete_user as _db_delete_user,
     get_audit_logs as _db_get_audit_logs,
@@ -478,6 +480,20 @@ class Api:
         kpis = self._celda_kpis.get("kpis", {}) if self._celda_kpis else {}
         ops = query_celda3105_operaciones(limit=10)
         return {"connected": connected, "kpis": kpis, "operaciones": ops}
+
+    def get_active_cycles(self) -> list:
+        if not self._session:
+            return []
+        if self._session.get("rol") not in ("planta2", "admin"):
+            return []
+        return query_celda3105_ciclos_activos()
+
+    def get_cycle_history(self) -> list:
+        if not self._session:
+            return []
+        if self._session.get("rol") not in ("planta2", "admin"):
+            return []
+        return query_celda3105_ciclos_historial(limit=10)
 
     def get_quality_gate(self) -> dict:
         if not self._session:

@@ -575,6 +575,14 @@
     .login-logo-icon { width: 30px; height: 30px; }
     .login-logo-icon i { font-size: 16px; }
 
+    .tracza-cycle-card { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:var(--bg); border-radius:6px; border:0.5px solid var(--border); margin-bottom:8px; }
+    .tracza-tipo-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; background:var(--accent-light); color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; }
+    .tracza-timer { font-size:20px; font-weight:700; font-family:monospace; min-width:58px; text-align:right; }
+    .tracza-timer.t-ok   { color:var(--success-text, #2ed573); }
+    .tracza-timer.t-warn { color:var(--warning-text, #ffa502); }
+    .tracza-timer.t-crit { color:var(--danger-text,  #ff4757); }
+    .tracza-id { font-size:10px; color:var(--text-hint); font-family:monospace; }
+
     .rfid-row { padding: 5px 8px; font-size: 11px; }
     .status-row { padding: 3px 0; }
     .status-name { font-size: 11px; }
@@ -1032,6 +1040,26 @@
             </div>
           </div>
         </div>
+
+        <!-- Trazabilidad: Ciclos Activos + Historial -->
+        <div class="two-col" style="margin-top:12px;" id="tracza-panels">
+          <div class="card">
+            <div class="card-title">Ciclos Activos <span class="card-hint">en tiempo real</span></div>
+            <div id="activos-container">
+              <p id="activos-empty" style="color:var(--text-hint);font-size:12px;padding:12px 0;text-align:center;">Sin ciclos activos</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Historial de Ciclos <span class="card-hint">turno actual</span></div>
+            <table class="view-table">
+              <thead><tr><th>Ciclo</th><th>Tipo</th><th>Duración</th><th>Resultado</th><th>Hora</th></tr></thead>
+              <tbody id="historial-body">
+                <tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-hint)">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <!-- ── QUALITY GATE VIEW ── -->
@@ -1729,9 +1757,12 @@ function showView(name, btn) {
     clearInterval(viewTimers[currentView]);
     delete viewTimers[currentView];
   }
-  if (viewTimers.celdaFast)    { clearInterval(viewTimers.celdaFast);    delete viewTimers.celdaFast; }
-  if (viewTimers.celdaKpis)    { clearInterval(viewTimers.celdaKpis);    delete viewTimers.celdaKpis; }
-  if (viewTimers.qualityChart) { clearInterval(viewTimers.qualityChart); delete viewTimers.qualityChart; }
+  if (viewTimers.celdaFast)      { clearInterval(viewTimers.celdaFast);      delete viewTimers.celdaFast; }
+  if (viewTimers.celdaKpis)      { clearInterval(viewTimers.celdaKpis);      delete viewTimers.celdaKpis; }
+  if (viewTimers.celdaActivos)   { clearInterval(viewTimers.celdaActivos);   delete viewTimers.celdaActivos; }
+  if (viewTimers.celdaTimers)    { clearInterval(viewTimers.celdaTimers);    delete viewTimers.celdaTimers; }
+  if (viewTimers.celdaHistorial) { clearInterval(viewTimers.celdaHistorial); delete viewTimers.celdaHistorial; }
+  if (viewTimers.qualityChart)   { clearInterval(viewTimers.qualityChart);   delete viewTimers.qualityChart; }
   currentView = name;
 
   document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
@@ -2099,8 +2130,13 @@ async function loadCelda() {
 
   } catch(e) { showCeldaOffline(true); }
 
-  if (!viewTimers.celdaFast) viewTimers.celdaFast = setInterval(loadCeldaFast, 200);
-  if (!viewTimers.celdaKpis) viewTimers.celdaKpis = setInterval(loadCeldaKpis, 500);
+  if (!viewTimers.celdaFast)     viewTimers.celdaFast     = setInterval(loadCeldaFast,     200);
+  if (!viewTimers.celdaKpis)     viewTimers.celdaKpis     = setInterval(loadCeldaKpis,     500);
+  if (!viewTimers.celdaActivos)  viewTimers.celdaActivos  = setInterval(loadCeldaActivos,  500);
+  if (!viewTimers.celdaTimers)   viewTimers.celdaTimers   = setInterval(_tickActiveTimers, 200);
+  if (!viewTimers.celdaHistorial) viewTimers.celdaHistorial = setInterval(loadCeldaHistorial, 5000);
+  loadCeldaActivos();
+  loadCeldaHistorial();
 }
 
 async function loadCeldaFast() {
@@ -2209,6 +2245,109 @@ function setCeldaSignal(id, value, invertColor) {
   const success = invertColor ? false : active;
   el.className  = danger ? 'badge badge-danger' : success ? 'badge badge-success' : 'badge badge-warning';
   el.innerHTML  = `<span class="badge-dot"></span>${active ? 'SÍ' : 'NO'}`;
+}
+
+// ── Trazabilidad: Ciclos Activos + Historial ──────────────────────────────────
+let _activeCycles = [];  // cache: [{ciclo_id, tipo, start_ts}]
+
+function _fmtMmSs(secs) {
+  const s = Math.floor(secs);
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function _timerClass(elapsed) {
+  if (elapsed < 90)  return 't-ok';
+  if (elapsed < 120) return 't-warn';
+  return 't-crit';
+}
+
+function _renderActiveCycles(cycles) {
+  const container = document.getElementById('activos-container');
+  const empty     = document.getElementById('activos-empty');
+  if (!container) return;
+  if (!cycles || cycles.length === 0) {
+    if (empty) empty.style.display = '';
+    const existing = container.querySelectorAll('.tracza-cycle-card');
+    existing.forEach(el => el.remove());
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const now = Date.now() / 1000;
+  const seen = new Set(cycles.map(c => c.ciclo_id));
+
+  // Remove cards no longer active
+  container.querySelectorAll('.tracza-cycle-card').forEach(el => {
+    if (!seen.has(el.dataset.cicloId)) el.remove();
+  });
+
+  cycles.forEach(cycle => {
+    const shortId = cycle.ciclo_id.slice(-6);
+    const elapsed = cycle.start_ts > 0 ? Math.max(0, now - cycle.start_ts) : 0;
+    const tClass  = _timerClass(elapsed);
+    let card = container.querySelector(`[data-ciclo-id="${cycle.ciclo_id}"]`);
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'tracza-cycle-card';
+      card.dataset.cicloId  = cycle.ciclo_id;
+      card.dataset.startTs  = cycle.start_ts;
+      card.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <span class="tracza-tipo-badge">${cycle.tipo}</span>
+          <span class="tracza-id">${shortId}</span>
+        </div>
+        <span class="tracza-timer ${tClass}" id="timer-${shortId}">${_fmtMmSs(elapsed)}</span>`;
+      container.appendChild(card);
+    } else {
+      card.dataset.startTs = cycle.start_ts;
+    }
+  });
+}
+
+function _tickActiveTimers() {
+  const now = Date.now() / 1000;
+  document.querySelectorAll('.tracza-cycle-card').forEach(card => {
+    const startTs = parseFloat(card.dataset.startTs || 0);
+    const elapsed = startTs > 0 ? Math.max(0, now - startTs) : 0;
+    const shortId = card.dataset.cicloId ? card.dataset.cicloId.slice(-6) : '';
+    const timerEl = document.getElementById('timer-' + shortId);
+    if (timerEl) {
+      timerEl.textContent = _fmtMmSs(elapsed);
+      timerEl.className   = 'tracza-timer ' + _timerClass(elapsed);
+    }
+  });
+}
+
+async function loadCeldaActivos() {
+  try {
+    const cycles = await window.pywebview.api.get_active_cycles();
+    _activeCycles = Array.isArray(cycles) ? cycles : [];
+    _renderActiveCycles(_activeCycles);
+  } catch(e) {}
+}
+
+async function loadCeldaHistorial() {
+  try {
+    const rows = await window.pywebview.api.get_cycle_history();
+    const tbody = document.getElementById('historial-body');
+    if (!tbody) return;
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-hint)">Sin ciclos registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((r, i) => {
+      const ico = r.resultado === 'aprobado' ? '✅' : '❌';
+      const dur = r.duracion_s > 0 ? r.duracion_s.toFixed(1) + 's' : '—';
+      const shortId = r.ciclo_id ? r.ciclo_id.slice(-6) : '—';
+      return `<tr>
+        <td style="font-family:monospace;font-size:10px;color:var(--text-hint)">${shortId}</td>
+        <td>${r.tipo ?? '—'}</td>
+        <td>${dur}</td>
+        <td>${ico} ${r.resultado ?? '—'}</td>
+        <td style="color:var(--text-hint)">${r.hora ?? '—'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {}
 }
 
 // ── VIEW: Quality Gate ────────────────────────────────────────────────────────

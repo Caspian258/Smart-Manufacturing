@@ -577,6 +577,93 @@ def query_celda3105_operaciones(limit: int = 10) -> list[dict]:
         return _demo_celda3105_operaciones()
 
 
+def _demo_celda3105_ciclos_activos() -> list[dict]:
+    import time
+    now = time.time()
+    return [
+        {"ciclo_id": "CIC-0042", "tipo": "Torneado", "start_ts": now - 47},
+        {"ciclo_id": "CIC-0043", "tipo": "Fresado",  "start_ts": now - 112},
+    ]
+
+
+def _demo_celda3105_ciclos_historial() -> list[dict]:
+    return [
+        {"ciclo_id": "CIC-0041", "tipo": "Torneado", "duracion_s": 87.3,  "resultado": "aprobado",  "hora": "09:42:15"},
+        {"ciclo_id": "CIC-0040", "tipo": "Fresado",  "duracion_s": 103.1, "resultado": "rechazado", "hora": "09:38:02"},
+        {"ciclo_id": "CIC-0039", "tipo": "Torneado", "duracion_s": 91.5,  "resultado": "aprobado",  "hora": "09:33:47"},
+    ]
+
+
+def query_celda3105_ciclos_activos() -> list[dict]:
+    """Ciclos activos en Celda 3105 (measurement celda3105_ciclos, resultado=en_progreso)."""
+    client = _influx_client()
+    if client is None:
+        return _demo_celda3105_ciclos_activos()
+    flux = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: -8h)
+      |> filter(fn: (r) => r._measurement == "celda3105_ciclos")
+      |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+      |> filter(fn: (r) => r.resultado == "en_progreso")
+      |> sort(columns: ["_time"], desc: true)
+      |> limit(n: 2)
+    """
+    try:
+        tables = client.query_api().query(flux)
+        results = []
+        for table in tables:
+            for record in table.records:
+                v = record.values
+                results.append({
+                    "ciclo_id": str(v.get("ciclo_id", "—")),
+                    "tipo":     str(v.get("tipo", "—")),
+                    "start_ts": float(v.get("start_ts", 0) or 0),
+                })
+        client.close()
+        return results
+    except Exception as exc:
+        log.warning("query_celda3105_ciclos_activos: %s", exc)
+        try: client.close()
+        except Exception: pass
+        return []
+
+
+def query_celda3105_ciclos_historial(limit: int = 10) -> list[dict]:
+    """Últimos N ciclos completados en Celda 3105 (measurement celda3105_ciclos)."""
+    client = _influx_client()
+    if client is None:
+        return _demo_celda3105_ciclos_historial()
+    flux = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: -8h)
+      |> filter(fn: (r) => r._measurement == "celda3105_ciclos")
+      |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+      |> filter(fn: (r) => r.resultado == "aprobado" or r.resultado == "rechazado")
+      |> sort(columns: ["_time"], desc: true)
+      |> limit(n: {limit})
+    """
+    try:
+        tables = client.query_api().query(flux)
+        results = []
+        for table in tables:
+            for record in table.records:
+                v = record.values
+                results.append({
+                    "ciclo_id":  str(v.get("ciclo_id", "—")),
+                    "tipo":      str(v.get("tipo", "—")),
+                    "duracion_s": float(v.get("duracion_s", 0) or 0),
+                    "resultado": str(v.get("resultado", "—")),
+                    "hora":      record.get_time().strftime("%H:%M:%S"),
+                })
+        client.close()
+        return results
+    except Exception as exc:
+        log.warning("query_celda3105_ciclos_historial: %s", exc)
+        try: client.close()
+        except Exception: pass
+        return _demo_celda3105_ciclos_historial()
+
+
 def subscribe_celda3105_mqtt(callback) -> None:
     """
     Suscribe a MQTT_TOPIC_CELDA en un hilo daemon.
