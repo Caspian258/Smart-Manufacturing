@@ -6,8 +6,11 @@ FINGERPRINT_ENABLED = True  → primero verifica huella, luego PIN.
 """
 
 import logging
+import threading
 import time
 from datetime import datetime, timedelta
+
+_fp_lock = threading.Lock()   # un solo acceso al sensor UART a la vez
 
 import bcrypt
 
@@ -118,6 +121,8 @@ def verify_fingerprint(expected_huella_id: int) -> tuple:
       (False, msg)  — huella rechazada (no coincide o no reconocida)
       (None,  msg)  — timeout o error de hardware → usar fallback PIN-only
     """
+    if not _fp_lock.acquire(timeout=1):
+        return None, "Sensor ocupado — fallback a PIN"
     try:
         from pyfingerprint.pyfingerprint import PyFingerprint  # type: ignore
         sensor = PyFingerprint(AS608_PORT, AS608_BAUD, 0xFFFFFFFF, 0x00000000)
@@ -147,6 +152,8 @@ def verify_fingerprint(expected_huella_id: int) -> tuple:
     except Exception as exc:
         log.error("Error sensor AS608: %s", exc)
         return None, f"Error sensor: {exc}"
+    finally:
+        _fp_lock.release()
 
 
 def enroll_fingerprint(huella_id: int) -> tuple[bool, str]:
@@ -192,6 +199,8 @@ def authenticate_by_fingerprint() -> "AuthResult":
     No requiere que el usuario ingrese nombre ni PIN.
     Retorna AuthResult con ok=True si encuentra un usuario registrado.
     """
+    if not _fp_lock.acquire(timeout=1):
+        return AuthResult(False, message="Sensor ocupado")
     try:
         from pyfingerprint.pyfingerprint import PyFingerprint  # type: ignore
         sensor = PyFingerprint(AS608_PORT, AS608_BAUD, 0xFFFFFFFF, 0x00000000)
@@ -232,6 +241,8 @@ def authenticate_by_fingerprint() -> "AuthResult":
     except Exception as exc:
         log.error("Error sensor AS608 en authenticate_by_fingerprint: %s", exc)
         return AuthResult(False, message=f"Error sensor: {exc}")
+    finally:
+        _fp_lock.release()
 
 
 # ---------------------------------------------------------------------------
