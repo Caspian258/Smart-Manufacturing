@@ -1481,3 +1481,16 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
 | 0.4.0 | 2026-03-28 | Pipeline ESP32 → MQTT → n8n → InfluxDB — Primer dato MQTT |
 | 0.3.0 | 2026-03-28 | Stack RPi5 operativo |
 | 0.1.0 | 2026-03-28 | Estructura inicial |
+
+## ENTRADA #081 — Trazabilidad por pieza Celda 3105
+- **Fecha**: 2026-06-08 00:00
+- **Acción**: Agrega paneles de trazabilidad en la vista Celda 3105 de la app PyWebView
+- **Estado**: ✅ Completado
+- **Archivos modificados**: app/db.py, app/main.py, app/templates/index.html
+- **Detalles**:
+  - Panel "Ciclos Activos": cards con badge de tipo, timer MM:SS en verde (<90s) / amarillo (90-120s) / rojo (>120s), ID corto. El timer se actualiza cada 200ms en JS desde `start_ts` sin llamadas extra al backend. Polling de datos: 500ms via `get_active_cycles()`.
+  - Panel "Historial de Ciclos": tabla de últimos 10 ciclos del turno (ciclo_id corto, tipo, duración, resultado ✅/❌, hora). Polling: 5s via `get_cycle_history()`.
+  - Backend: `query_celda3105_ciclos_activos()` y `query_celda3105_ciclos_historial()` en db.py leen measurement `celda3105_ciclos` (nuevo). Demo data incluida para cuando InfluxDB no está disponible.
+  - Roles permitidos: planta2 y admin.
+  - Timers correctamente limpiados en `showView()` al navegar fuera de la vista.
+- **Próximo paso**: Definir flujo de escritura a `celda3105_ciclos` desde Node-RED o el ESP32
