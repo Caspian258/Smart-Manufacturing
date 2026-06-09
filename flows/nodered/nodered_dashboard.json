@@ -565,7 +565,8 @@
     "wires": [
       [
         "parse-plc",
-        "debug-plc-raw"
+        "debug-plc-raw",
+        "detectar-flancos"
       ]
     ]
   },
@@ -937,6 +938,69 @@
     "broker": "mqtt-broker-config",
     "x": 700,
     "y": 400,
+    "wires": []
+  },
+  {
+    "id": "detectar-flancos",
+    "type": "function",
+    "z": "tab-celda3105",
+    "name": "detectar flancos",
+    "func": "// Estado previo del PLC\nconst prev = context.get('prev') || {};\nconst curr = msg.payload;\n\nconst events = [];\n\n// Flanco subida C2_Boton_Verde → INICIO\nif (curr.C2_Boton_Verde && !prev.C2_Boton_Verde) {\n    events.push({\n        type: 'inicio',\n        piece_type: curr.Cognex_out1 ? 2 : 1,\n        ts: Date.now()\n    });\n}\n\n// Flanco subida M_Ci3_cobot → FIN\nif (curr.M_Ci3_cobot && !prev.M_Ci3_cobot) {\n    events.push({\n        type: 'fin',\n        rechazada: curr.Pieza_rechazada || false,\n        ts: Date.now()\n    });\n}\n\ncontext.set('prev', curr);\n\nif (events.length === 0) return null;\nmsg.events = events;\nreturn msg;",
+    "outputs": 1,
+    "x": 380,
+    "y": 480,
+    "wires": [
+      [
+        "gestionar-ciclos"
+      ]
+    ]
+  },
+  {
+    "id": "gestionar-ciclos",
+    "type": "function",
+    "z": "tab-celda3105",
+    "name": "gestionar ciclos",
+    "func": "// Cola de ciclos activos (máx 2)\nlet activeCycles = context.get('activeCycles') || [];\nconst output = [];\n\nfor (const event of msg.events) {\n    if (event.type === 'inicio') {\n        const cycleId = 'C' + Date.now().toString(36).toUpperCase();\n        const cycle = {\n            cycle_id: cycleId,\n            piece_type: event.piece_type,\n            start_ts: event.ts,\n            result: 'en_progreso'\n        };\n        activeCycles.push(cycle);\n        \n        output.push({\n            measurement: 'celda3105_ciclos',\n            tags: {\n                piece_type: 'Tipo' + event.piece_type,\n                result: 'en_progreso'\n            },\n            fields: {\n                cycle_id: cycleId,\n                duration_s: 0.0,\n                start_ts: event.ts / 1000\n            },\n            timestamp: new Date()\n        });\n    }\n    \n    if (event.type === 'fin' && activeCycles.length > 0) {\n        const cycle = activeCycles.shift();\n        const duration = (event.ts - cycle.start_ts) / 1000;\n        const result = event.rechazada ? 'rechazado' : 'aprobado';\n        \n        output.push({\n            measurement: 'celda3105_ciclos',\n            tags: {\n                piece_type: 'Tipo' + cycle.piece_type,\n                result: result\n            },\n            fields: {\n                cycle_id: cycle.cycle_id,\n                duration_s: Math.round(duration * 10) / 10,\n                start_ts: cycle.start_ts / 1000\n            },\n            timestamp: new Date()\n        });\n    }\n}\n\ncontext.set('activeCycles', activeCycles);\n\nif (output.length === 0) return null;\nmsg.payload = output;\nreturn msg;",
+    "outputs": 1,
+    "x": 680,
+    "y": 480,
+    "wires": [
+      [
+        "fmt-ciclos-influx"
+      ]
+    ]
+  },
+  {
+    "id": "fmt-ciclos-influx",
+    "type": "function",
+    "z": "tab-celda3105",
+    "name": "→ Line Protocol",
+    "func": "// Convierte array de objetos InfluxDB a Line Protocol\nconst points = Array.isArray(msg.payload) ? msg.payload : [msg.payload];\nconst lines = [];\nfor (const p of points) {\n    const tags = Object.entries(p.tags || {})\n        .map(([k,v]) => k + '=' + String(v).replace(/ /g,'_'))\n        .join(',');\n    const fields = Object.entries(p.fields || {})\n        .map(([k,v]) => typeof v === 'string' ? k + '=\"' + v + '\"' : k + '=' + v)\n        .join(',');\n    const ts = p.timestamp instanceof Date ? p.timestamp.getTime() : Date.now();\n    lines.push(p.measurement + ',' + tags + ' ' + fields + ' ' + ts);\n}\nmsg.payload = lines.join('\\n');\nmsg.headers = { 'Content-Type': 'text/plain; charset=utf-8' };\nreturn msg;",
+    "outputs": 1,
+    "x": 960,
+    "y": 480,
+    "wires": [
+      [
+        "http-influx-celda",
+        "debug-ciclos"
+      ]
+    ]
+  },
+  {
+    "id": "debug-ciclos",
+    "type": "debug",
+    "z": "tab-celda3105",
+    "name": "ciclos InfluxDB",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1180,
+    "y": 480,
     "wires": []
   }
 ]
