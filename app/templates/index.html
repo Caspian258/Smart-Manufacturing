@@ -1510,8 +1510,9 @@ function showView(name, btn) {
     clearInterval(viewTimers[currentView]);
     delete viewTimers[currentView];
   }
-  if (viewTimers.celdaFast) { clearInterval(viewTimers.celdaFast); delete viewTimers.celdaFast; }
-  if (viewTimers.celdaKpis) { clearInterval(viewTimers.celdaKpis); delete viewTimers.celdaKpis; }
+  if (viewTimers.celdaFast)    { clearInterval(viewTimers.celdaFast);    delete viewTimers.celdaFast; }
+  if (viewTimers.celdaKpis)    { clearInterval(viewTimers.celdaKpis);    delete viewTimers.celdaKpis; }
+  if (viewTimers.qualityChart) { clearInterval(viewTimers.qualityChart); delete viewTimers.qualityChart; }
   currentView = name;
 
   document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
@@ -1992,21 +1993,11 @@ function setCeldaSignal(id, value, invertColor) {
 }
 
 // ── VIEW: Quality Gate ────────────────────────────────────────────────────────
-async function loadQuality() {
-  // Los KPIs Quality Gate ya se actualizan desde loadCelda()
-  // Solo inicializar la gráfica si no existe
-  if (qualChart) { qualChart.destroy(); qualChart = null; }
-  const ctx = document.getElementById('qualityChart');
-  if (!ctx) return;
-
-  // Badge de estado y datos para el gráfico
-  let aprobadas = 0, rechazadas = 0;
+async function loadQualityKpis() {
   try {
     const d = await window.pywebview.api.get_quality_gate();
     if (d && !d.error) {
       const connected = !!d.connected;
-      aprobadas  = d.aprobadas  ?? 0;
-      rechazadas = d.rechazadas ?? 0;
       const badge = document.getElementById('quality-status-badge');
       if (badge) {
         badge.className = connected ? 'badge badge-success' : 'badge badge-warning';
@@ -2017,7 +2008,6 @@ async function loadQuality() {
     }
   } catch(e) {}
 
-  // KPI cards de texto — misma fuente que Celda 3105 (topic celda3105/plc/kpis, ventana 30s)
   try {
     const k = await window.pywebview.api.get_celda_kpis();
     if (k && !k.error) {
@@ -2025,8 +2015,6 @@ async function loadQuality() {
       const apr = K.piezas_aprobadas  ?? 0;
       const rec = K.piezas_rechazadas ?? 0;
       const total = apr + rec || 1;
-      aprobadas  = apr;
-      rechazadas = rec;
       setEl('q-total',          K.piezas_procesadas ?? 0);
       setEl('q-aprobadas',      apr);
       setEl('q-rechazadas',     rec);
@@ -2039,36 +2027,62 @@ async function loadQuality() {
       if (barR) barR.style.width = (rec / total * 100).toFixed(1) + '%';
     }
   } catch(e) {}
+}
+
+async function loadQualityChart() {
+  const ctx = document.getElementById('qualityChart');
+  if (!ctx) return;
+
+  let apr = 0, rec = 0;
+  try {
+    const k = await window.pywebview.api.get_celda_kpis();
+    if (k && !k.error) {
+      const K = k.kpis || {};
+      apr = K.piezas_aprobadas  ?? 0;
+      rec = K.piezas_rechazadas ?? 0;
+    }
+  } catch(e) {}
 
   const hours = Array.from({length:8}, (_, i) => {
     const d = new Date(); d.setHours(d.getHours() - 7 + i);
     return d.toLocaleTimeString('es-MX', {hour:'2-digit'}) + 'h';
   });
-  const lastH = hours[7];
-  const aData = Array(8).fill(0); aData[7] = aprobadas;
-  const rData = Array(8).fill(0); rData[7] = rechazadas;
+  const aData = Array(8).fill(0); aData[7] = apr;
+  const rData = Array(8).fill(0); rData[7] = rec;
 
-  qualChart = new Chart(ctx.getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: hours,
-      datasets: [
-        { label:'Aprobadas',  data: aData, backgroundColor:'rgba(59,109,17,0.2)',  borderColor:'#3B6D11', borderWidth:1 },
-        { label:'Rechazadas', data: rData, backgroundColor:'rgba(163,45,45,0.15)', borderColor:'#A32D2D', borderWidth:1 },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      animation: { duration: 300 },
-      plugins: { legend: { display:true, labels:{ font:{size:10}, color:'#6b6b6b', boxWidth:10 } } },
-      scales: {
-        x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false} },
-        y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false}, min:0 },
+  if (!qualChart) {
+    qualChart = new Chart(ctx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: hours,
+        datasets: [
+          { label:'Aprobadas',  data: aData, backgroundColor:'rgba(59,109,17,0.2)',  borderColor:'#3B6D11', borderWidth:1 },
+          { label:'Rechazadas', data: rData, backgroundColor:'rgba(163,45,45,0.15)', borderColor:'#A32D2D', borderWidth:1 },
+        ],
       },
-    },
-  });
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: { legend: { display:true, labels:{ font:{size:10}, color:'#6b6b6b', boxWidth:10 } } },
+        scales: {
+          x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false} },
+          y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#aaa',font:{size:10}}, border:{display:false}, min:0 },
+        },
+      },
+    });
+  } else {
+    qualChart.data.labels = hours;
+    qualChart.data.datasets[0].data = aData;
+    qualChart.data.datasets[1].data = rData;
+    qualChart.update('none');
+  }
+}
 
-  viewTimers.quality = setTimeout(loadQuality, 500);
+function loadQuality() {
+  loadQualityKpis();
+  loadQualityChart();
+  viewTimers.quality      = setInterval(loadQualityKpis,  500);
+  viewTimers.qualityChart = setInterval(loadQualityChart, 30000);
 }
 
 // ── VIEW: Costos MXN ──────────────────────────────────────────────────────────
