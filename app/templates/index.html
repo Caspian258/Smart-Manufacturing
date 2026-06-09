@@ -1999,7 +1999,7 @@ async function loadQuality() {
   const ctx = document.getElementById('qualityChart');
   if (!ctx) return;
 
-  // Obtener datos Quality Gate en tiempo real (MQTT)
+  // Badge de estado y datos para el gráfico
   let aprobadas = 0, rechazadas = 0;
   try {
     const d = await window.pywebview.api.get_quality_gate();
@@ -2007,7 +2007,6 @@ async function loadQuality() {
       const connected = !!d.connected;
       aprobadas  = d.aprobadas  ?? 0;
       rechazadas = d.rechazadas ?? 0;
-
       const badge = document.getElementById('quality-status-badge');
       if (badge) {
         badge.className = connected ? 'badge badge-success' : 'badge badge-warning';
@@ -2015,20 +2014,29 @@ async function loadQuality() {
       }
       const noData = document.getElementById('quality-no-data');
       if (noData) noData.style.display = connected ? 'none' : '';
+    }
+  } catch(e) {}
 
-      // Actualizar KPIs de texto (misma fuente que loadCeldaKpis)
-      const inspeccionadas = d.inspeccionadas ?? 0;
-      const total = aprobadas + rechazadas || 1;
-      setEl('q-total',         inspeccionadas);
-      setEl('q-aprobadas',     aprobadas);
-      setEl('q-rechazadas',    rechazadas);
-      setEl('q-rendimiento',   total > 1 ? (aprobadas / total * 100).toFixed(1) : '—');
-      setEl('q-aprobadas-num',  aprobadas  + ' / ' + total);
-      setEl('q-rechazadas-num', rechazadas + ' / ' + total);
+  // KPI cards de texto — misma fuente que Celda 3105 (topic celda3105/plc/kpis, ventana 30s)
+  try {
+    const k = await window.pywebview.api.get_celda_kpis();
+    if (k && !k.error) {
+      const K = k.kpis || {};
+      const apr = K.piezas_aprobadas  ?? 0;
+      const rec = K.piezas_rechazadas ?? 0;
+      const total = apr + rec || 1;
+      aprobadas  = apr;
+      rechazadas = rec;
+      setEl('q-total',          K.piezas_procesadas ?? 0);
+      setEl('q-aprobadas',      apr);
+      setEl('q-rechazadas',     rec);
+      setEl('q-rendimiento',    total > 1 ? (apr / total * 100).toFixed(1) : '—');
+      setEl('q-aprobadas-num',  apr + ' / ' + total);
+      setEl('q-rechazadas-num', rec + ' / ' + total);
       const barA = document.getElementById('q-aprobadas-bar');
       const barR = document.getElementById('q-rechazadas-bar');
-      if (barA) barA.style.width = (aprobadas  / total * 100).toFixed(1) + '%';
-      if (barR) barR.style.width = (rechazadas / total * 100).toFixed(1) + '%';
+      if (barA) barA.style.width = (apr / total * 100).toFixed(1) + '%';
+      if (barR) barR.style.width = (rec / total * 100).toFixed(1) + '%';
     }
   } catch(e) {}
 
