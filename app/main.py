@@ -33,8 +33,9 @@ import webview
 from config import (
     MACHINE_ID_PLANTA1, SCREEN_WIDTH, SCREEN_HEIGHT,
     MQTT_BROKER, MQTT_PORT_LOCAL, MQTT_APP_USER, MQTT_APP_PASS,
+    FINGERPRINT_ENABLED,
 )
-from auth import authenticate, bootstrap_users, add_user as _auth_add_user
+from auth import authenticate, authenticate_by_fingerprint, bootstrap_users, add_user as _auth_add_user
 from db import (
     query_latest_power,
     query_energy_24h,
@@ -196,6 +197,19 @@ class Api:
         if result.ok:
             self._session = {"username": result.username, "rol": result.rol}
             log.info("Login: %s (%s)", result.username, result.rol)
+            return {"success": True, "role": result.rol, "username": result.username}
+        return {"success": False, "message": result.message}
+
+    def get_config(self) -> dict:
+        """Configuración pública — sin secretos — para que el frontend adapte la UI."""
+        return {"fingerprint_enabled": FINGERPRINT_ENABLED}
+
+    def fingerprint_login(self) -> dict:
+        """Autenticación por huella dactilar — sin username ni PIN."""
+        result = authenticate_by_fingerprint()
+        if result.ok:
+            self._session = {"username": result.username, "rol": result.rol}
+            log.info("Login huella: %s (%s)", result.username, result.rol)
             return {"success": True, "role": result.rol, "username": result.username}
         return {"success": False, "message": result.message}
 

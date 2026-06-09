@@ -183,6 +183,58 @@ def enroll_fingerprint(huella_id: int) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Autenticación por huella — sin username/PIN
+# ---------------------------------------------------------------------------
+
+def authenticate_by_fingerprint() -> "AuthResult":
+    """
+    Escanea el sensor, identifica la huella y retorna el usuario asociado.
+    No requiere que el usuario ingrese nombre ni PIN.
+    Retorna AuthResult con ok=True si encuentra un usuario registrado.
+    """
+    try:
+        from pyfingerprint.pyfingerprint import PyFingerprint  # type: ignore
+        sensor = PyFingerprint(AS608_PORT, AS608_BAUD, 0xFFFFFFFF, 0x00000000)
+        if not sensor.verifyPassword():
+            return AuthResult(False, message="Sensor AS608: sin respuesta válida")
+
+        log.info("Esperando huella (timeout=%ds)...", AS608_TIMEOUT_S)
+        deadline = time.monotonic() + AS608_TIMEOUT_S
+        while not sensor.readImage():
+            if time.monotonic() >= deadline:
+                return AuthResult(False, message=f"Sin dedo detectado en {AS608_TIMEOUT_S}s")
+            time.sleep(0.05)
+
+        sensor.convertImage(0x01)
+        result = sensor.searchTemplate()
+        position, accuracy = result[0], result[1]
+
+        if position == -1:
+            return AuthResult(False, message="Huella no registrada")
+
+        huella_id = position + 1
+        conn = get_db()
+        row = conn.execute(
+            "SELECT * FROM users WHERE huella_id = ? AND activo = 1", (huella_id,)
+        ).fetchone()
+        conn.close()
+
+        if row is None:
+            return AuthResult(False, message=f"Huella en posición {position} sin usuario asociado")
+
+        log_audit(row["username"], "LOGIN_HUELLA", True,
+                  detalle=f"Autenticación por huella — pos={position}, acc={accuracy}")
+        return AuthResult(True, row["username"], row["rol"], huella_id,
+                         f"Acceso concedido (huella, precisión={accuracy})")
+
+    except ImportError:
+        return AuthResult(False, message="pyfingerprint no disponible")
+    except Exception as exc:
+        log.error("Error sensor AS608 en authenticate_by_fingerprint: %s", exc)
+        return AuthResult(False, message=f"Error sensor: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Autenticación principal
 # ---------------------------------------------------------------------------
 

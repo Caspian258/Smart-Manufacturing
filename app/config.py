@@ -11,7 +11,7 @@ SERVICES = {
     "grafana":   {"port": 3001, "type": "http", "path": "/api/health", "label": "Grafana"},
 }
 
-FINGERPRINT_ENABLED = False  # False = solo PIN; True = 2FA huella + PIN (requiere JM-101B conectado)
+FINGERPRINT_ENABLED = True   # False = solo PIN; True = 2FA huella + PIN (requiere JM-101B conectado)
 
 # MQTT — conexión local desde la app (sin TLS, misma máquina)
 MQTT_PORT_LOCAL = 1883
@@ -20,7 +20,7 @@ MQTT_APP_PASS   = "SmartMfg2024!"
 
 # Sensor AS608 — conexión UART (RPi5: TX→GPIO15, RX→GPIO14, VCC→Pin1 3.3V, GND→Pin6)
 # Puertos a intentar en orden: serial0 es el symlink canónico en RPi5
-AS608_PORT      = "/dev/ttyAMA10"   # serial0 → ttyAMA10 en esta RPi5
+AS608_PORT      = "/dev/ttyAMA0"    # serial0 → ttyAMA0 en esta RPi5 (confirmado funcional)
 AS608_BAUD      = 57600
 AS608_TIMEOUT_S = 5                 # segundos antes de omitir huella por timeout
 

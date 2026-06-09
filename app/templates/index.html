@@ -89,6 +89,19 @@
   }
   .login-btn:hover { background: var(--accent-dark); }
   .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-btn-fp {
+    width: 100%; padding: 10px; margin-top: 8px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-md); background: var(--surface);
+    color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background .15s;
+  }
+  .login-btn-fp:hover { background: var(--accent-light); }
+  .login-btn-fp:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-fp-status {
+    text-align: center; font-size: 12px; color: var(--text-secondary);
+    margin-top: 6px; display: none;
+  }
   .login-error {
     font-size: 12px; color: var(--danger-text);
     background: var(--danger-bg);
@@ -547,6 +560,10 @@
     <input class="login-input" type="password" id="login-pin" placeholder="••••••" maxlength="6"
            onkeydown="if(event.key==='Enter') doLogin()"/>
     <button class="login-btn" id="login-btn" onclick="doLogin()">Ingresar</button>
+    <button class="login-btn-fp" id="fp-btn" onclick="doFingerprintLogin()" style="display:none">
+      <i class="ti ti-fingerprint"></i> Usar huella dactilar
+    </button>
+    <div class="login-fp-status" id="fp-status"></div>
     <div class="login-error" id="login-error">Usuario o PIN incorrecto</div>
   </div>
 </div>
@@ -1342,9 +1359,14 @@ async function loadRFIDCycles() {
 }
 
 // ── pywebview handshake ───────────────────────────────────────────────────────
-window.addEventListener('pywebviewready', () => {
+window.addEventListener('pywebviewready', async () => {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+  try {
+    const cfg = await window.pywebview.api.get_config();
+    const fpBtn = document.getElementById('fp-btn');
+    if (fpBtn && cfg && cfg.fingerprint_enabled) fpBtn.style.display = 'flex';
+  } catch(e) {}
 });
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('login-btn');
@@ -1436,40 +1458,7 @@ async function doLogin() {
   try {
     const res = await window.pywebview.api.login(user, pin);
     if (res && res.success) {
-      currentRole = res.role;
-      setEl('user-name',   res.username || user);
-      setEl('user-role',   res.role === 'admin' ? 'Acceso total' : res.role);
-      setEl('user-avatar', (res.username || user).slice(0,2).toUpperCase());
-
-      // Mostrar solo las secciones del sidebar permitidas por rol
-      const navP1 = document.getElementById('nav-planta1');
-      const navP2 = document.getElementById('nav-planta2');
-      const navAd = document.getElementById('nav-admin');
-      if (res.role === 'admin') {
-        navP1.style.display = 'block';
-        navP2.style.display = 'block';
-        navAd.style.display = 'block';
-      } else if (res.role === 'planta1') {
-        navP1.style.display = 'block';
-        navP2.style.display = 'none';
-        navAd.style.display = 'none';
-      } else if (res.role === 'planta2') {
-        navP1.style.display = 'none';
-        navP2.style.display = 'block';
-        navAd.style.display = 'none';
-      }
-
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app').classList.add('visible');
-
-      // Navegar a la vista inicial correcta según rol
-      if (res.role === 'planta2') {
-        showView('celda', document.querySelector('#nav-planta2 .nav-item'));
-      } else {
-        initDashChart();
-        showView('dashboard', document.querySelector('#nav-planta1 .nav-item'));
-      }
-      startPolling();
+      _applyLoginSuccess(res, user);
     } else {
       err.textContent   = (res && res.message) ? res.message : 'Usuario o PIN incorrecto';
       err.style.display = 'block';
@@ -1480,6 +1469,63 @@ async function doLogin() {
     err.textContent = 'Error de conexión con el backend';
     err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Ingresar';
+  }
+}
+
+function _applyLoginSuccess(res, username) {
+  currentRole = res.role;
+  setEl('user-name',   res.username || username || '');
+  setEl('user-role',   res.role === 'admin' ? 'Acceso total' : res.role);
+  setEl('user-avatar', (res.username || username || '?').slice(0,2).toUpperCase());
+  const navP1 = document.getElementById('nav-planta1');
+  const navP2 = document.getElementById('nav-planta2');
+  const navAd = document.getElementById('nav-admin');
+  if (res.role === 'admin') {
+    navP1.style.display = 'block'; navP2.style.display = 'block'; navAd.style.display = 'block';
+  } else if (res.role === 'planta1') {
+    navP1.style.display = 'block'; navP2.style.display = 'none'; navAd.style.display = 'none';
+  } else if (res.role === 'planta2') {
+    navP1.style.display = 'none'; navP2.style.display = 'block'; navAd.style.display = 'none';
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  if (res.role === 'planta2') {
+    showView('celda', document.querySelector('#nav-planta2 .nav-item'));
+  } else {
+    initDashChart();
+    showView('dashboard', document.querySelector('#nav-planta1 .nav-item'));
+  }
+  startPolling();
+}
+
+async function doFingerprintLogin() {
+  const err    = document.getElementById('login-error');
+  const fpBtn  = document.getElementById('fp-btn');
+  const fpSt   = document.getElementById('fp-status');
+  const loginBtn = document.getElementById('login-btn');
+  err.style.display = 'none';
+  fpBtn.disabled = true;
+  loginBtn.disabled = true;
+  fpSt.textContent = '👆 Coloca tu dedo en el sensor...';
+  fpSt.style.display = 'block';
+  try {
+    const res = await window.pywebview.api.fingerprint_login();
+    if (res && res.success) {
+      fpSt.style.display = 'none';
+      _applyLoginSuccess(res, res.username);
+    } else {
+      fpSt.style.display = 'none';
+      err.textContent   = (res && res.message) ? res.message : 'Huella no reconocida';
+      err.style.display = 'block';
+      fpBtn.disabled  = false;
+      loginBtn.disabled = false;
+    }
+  } catch(e) {
+    fpSt.style.display = 'none';
+    err.textContent = 'Error de conexión con el backend';
+    err.style.display = 'block';
+    fpBtn.disabled  = false;
+    loginBtn.disabled = false;
   }
 }
 
