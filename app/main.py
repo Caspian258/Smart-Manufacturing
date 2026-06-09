@@ -332,11 +332,6 @@ class Api:
             return []
         return _db_get_audit_logs(limit=500)
 
-    # ── Config ────────────────────────────────────────────────────────────
-
-    def get_config(self) -> dict:
-        return {}
-
     # ── RFID Trazabilidad ─────────────────────────────────────────────────
 
     def get_active_cycle(self) -> dict:
