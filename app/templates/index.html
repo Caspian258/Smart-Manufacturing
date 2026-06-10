@@ -6,6 +6,8 @@
 <title>UNIX&Co. — Smart Manufacturing</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -591,6 +593,92 @@
     .view-table td { padding: 5px 8px; }
     .filter-bar { margin-bottom: 6px; gap: 5px; }
   }
+
+  /* ── Dashboard Builder ── */
+  .dash-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px; padding: 4px 0;
+  }
+  .dash-card {
+    background: var(--surface); border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-lg); padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+    cursor: default; transition: box-shadow .15s;
+  }
+  .dash-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+  .dash-card-title { font-weight: 600; font-size: 14px; }
+  .dash-card-desc  { font-size: 12px; color: var(--text-secondary); flex: 1; }
+  .dash-card-meta  { font-size: 11px; color: var(--text-hint); }
+  .dash-card-actions { display: flex; gap: 6px; margin-top: 4px; }
+
+  /* Widget card dentro de gridstack */
+  .widget-card {
+    background: var(--surface); border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); display: flex; flex-direction: column;
+    height: 100%; overflow: hidden;
+  }
+  .widget-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px 6px; border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+  }
+  .widget-title { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .widget-actions { display: flex; gap: 4px; }
+  .widget-actions button {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-hint); padding: 2px 4px; border-radius: 4px;
+    font-size: 13px; line-height: 1; transition: color .1s;
+  }
+  .widget-actions button:hover { color: var(--text-primary); }
+  .widget-body { flex: 1; padding: 8px; overflow: hidden; position: relative; }
+  .widget-body canvas { width: 100% !important; height: 100% !important; }
+
+  /* KPI widget */
+  .widget-kpi {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; text-align: center; gap: 4px;
+  }
+  .widget-kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+  .widget-kpi-trend { font-size: 12px; color: var(--text-hint); margin-top: 4px; }
+
+  /* Table widget */
+  .widget-table-wrap { overflow: auto; height: 100%; }
+  .widget-table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+  }
+  .widget-table th {
+    background: var(--bg); color: var(--text-secondary); padding: 5px 8px;
+    text-align: left; position: sticky; top: 0; font-size: 10px; font-weight: 600;
+  }
+  .widget-table td { padding: 4px 8px; border-bottom: 0.5px solid var(--border); }
+
+  /* Gridstack override */
+  .grid-stack { background: transparent; }
+  .grid-stack-item-content { border-radius: var(--radius-md); }
+
+  /* Widget modal steps */
+  .wm-step { display: none; }
+  .wm-step.active { display: block; }
+  .wm-tipo-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-bottom: 12px;
+  }
+  .wm-tipo-btn {
+    border: 1.5px solid var(--border-md); border-radius: var(--radius-md);
+    padding: 10px 6px; cursor: pointer; text-align: center; font-size: 12px;
+    background: var(--surface); transition: border-color .12s, background .12s;
+  }
+  .wm-tipo-btn:hover, .wm-tipo-btn.selected {
+    border-color: var(--accent); background: var(--accent-light);
+  }
+  .wm-tipo-btn i { display: block; font-size: 20px; margin-bottom: 4px; color: var(--accent); }
+  .wm-preview-box {
+    border: 0.5px solid var(--border-md); border-radius: var(--radius-md);
+    padding: 10px; min-height: 160px; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wm-preview-box canvas { max-height: 140px; }
 </style>
 </head>
 <body>
@@ -655,6 +743,13 @@
           <span class="brand-name">UNIX&amp;Co.</span>
         </div>
         <span class="brand-sub">CIMA + Celda 3105</span>
+      </div>
+
+      <div class="sidebar-section" id="nav-general">
+        <p class="sidebar-section-label">General</p>
+        <button class="nav-item" onclick="showView('dashboards', this)">
+          <i class="ti ti-layout-dashboard"></i> Dashboards
+        </button>
       </div>
 
       <div class="sidebar-section" id="nav-planta1">
@@ -1417,6 +1512,211 @@
         </div>
       </div>
 
+      <!-- ── DASHBOARDS VIEW ── -->
+      <div id="view-dashboards" style="display:none;">
+
+        <!-- Vista A: lista de dashboards -->
+        <div id="dash-list-view">
+          <div class="content-header">
+            <div>
+              <p class="content-title">Dashboards</p>
+              <p class="content-sub">Crea y personaliza dashboards con widgets en tiempo real</p>
+            </div>
+            <button class="btn-primary" onclick="openCreateDashModal()">
+              <i class="ti ti-plus"></i> Nuevo Dashboard
+            </button>
+          </div>
+          <div id="dash-card-container" class="dash-card-grid">
+            <div style="color:var(--text-hint);font-size:13px">Cargando...</div>
+          </div>
+        </div>
+
+        <!-- Vista B: editor de dashboard -->
+        <div id="dash-editor-view" style="display:none;">
+          <div class="content-header" style="margin-bottom:12px;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
+              <button class="btn-ghost" onclick="exitDashEditor()">← Volver</button>
+              <input id="dash-editor-nombre" class="login-input"
+                     style="margin:0;flex:1;max-width:320px;font-weight:500"
+                     placeholder="Nombre del dashboard"
+                     onblur="saveDashName()"/>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button class="btn-ghost" onclick="openWidgetModal(null)">
+                <i class="ti ti-plus"></i> Widget
+              </button>
+              <button class="btn-ghost" onclick="saveDashName()">
+                <i class="ti ti-device-floppy"></i> Guardar
+              </button>
+            </div>
+          </div>
+          <div id="dashboard-grid" class="grid-stack"></div>
+        </div>
+      </div>
+
+      <!-- Modal: crear dashboard -->
+      <div id="modal-create-dash" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border-radius:var(--radius-lg);padding:24px 28px;width:400px;max-width:95vw;">
+          <p style="font-size:15px;font-weight:500;margin-bottom:16px">Nuevo Dashboard</p>
+          <label class="login-label">Nombre</label>
+          <input class="login-input" id="dash-new-nombre" placeholder="ej. Panel de Producción"/>
+          <label class="login-label">Descripción (opcional)</label>
+          <input class="login-input" id="dash-new-desc" placeholder="ej. KPIs del turno actual"/>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-ghost" style="flex:1" onclick="closeCreateDashModal()">Cancelar</button>
+            <button class="btn-primary" style="flex:1" onclick="submitCreateDash()">Crear</button>
+          </div>
+          <p id="dash-new-msg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+        </div>
+      </div>
+
+      <!-- Modal: agregar/editar widget (3 pasos) -->
+      <div id="modal-widget" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border-radius:var(--radius-lg);padding:24px 28px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <p style="font-size:15px;font-weight:500" id="wm-title">Agregar Widget</p>
+            <div style="display:flex;gap:6px;font-size:11px;color:var(--text-hint)">
+              <span id="wm-step-ind">Paso 1 / 3</span>
+            </div>
+          </div>
+
+          <!-- Paso 1: Tipo -->
+          <div class="wm-step active" id="wm-step-1">
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Tipo de widget</p>
+            <div class="wm-tipo-grid">
+              <button class="wm-tipo-btn" onclick="selectTipo('line', this)">
+                <i class="ti ti-chart-line"></i>Línea
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('area', this)">
+                <i class="ti ti-chart-area"></i>Área
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('bar', this)">
+                <i class="ti ti-chart-bar"></i>Barras
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('pie', this)">
+                <i class="ti ti-chart-pie"></i>Pastel
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('kpi', this)">
+                <i class="ti ti-number"></i>KPI
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('table', this)">
+                <i class="ti ti-table"></i>Tabla
+              </button>
+            </div>
+            <label class="login-label">Título del widget</label>
+            <input class="login-input" id="wm-titulo" placeholder="ej. Potencia Torno"/>
+            <label class="login-label">Tamaño (columnas × filas)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label class="login-label" style="font-size:10px">Ancho (1-12)</label>
+                <input class="login-input" id="wm-ancho" type="number" value="6" min="2" max="12"/>
+              </div>
+              <div>
+                <label class="login-label" style="font-size:10px">Alto (filas)</label>
+                <input class="login-input" id="wm-alto" type="number" value="3" min="2" max="8"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Paso 2: Fuente -->
+          <div class="wm-step" id="wm-step-2">
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Fuente de datos</p>
+            <label class="login-label">Fuente</label>
+            <select class="login-input" id="wm-fuente" onchange="onFuenteChange()">
+              <option value="influxdb">InfluxDB (métricas de sensores)</option>
+              <option value="plc">PLC directo (python-snap7)</option>
+              <option value="static">Estático (datos manuales)</option>
+            </select>
+
+            <!-- InfluxDB config -->
+            <div id="wm-cfg-influx">
+              <label class="login-label">Measurement</label>
+              <input class="login-input" id="wm-measurement" value="sensor-data"/>
+              <label class="login-label">Field</label>
+              <input class="login-input" id="wm-field" value="power_w"/>
+              <label class="login-label">Machine ID (opcional)</label>
+              <input class="login-input" id="wm-machine" placeholder="ej. torno"/>
+              <label class="login-label">Rango de tiempo</label>
+              <select class="login-input" id="wm-range">
+                <option value="-15m">Últimos 15 min</option>
+                <option value="-1h" selected>Última hora</option>
+                <option value="-2h">Últimas 2 h</option>
+                <option value="-8h">Últimas 8 h</option>
+                <option value="-24h">Últimas 24 h</option>
+              </select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                  <label class="login-label">Agregación</label>
+                  <select class="login-input" id="wm-aggregation">
+                    <option value="mean">mean (promedio)</option>
+                    <option value="max">max</option>
+                    <option value="min">min</option>
+                    <option value="sum">sum</option>
+                    <option value="last">last</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="login-label">Ventana</label>
+                  <select class="login-input" id="wm-window">
+                    <option value="1m">1 min</option>
+                    <option value="5m" selected>5 min</option>
+                    <option value="15m">15 min</option>
+                    <option value="1h">1 hora</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- PLC config -->
+            <div id="wm-cfg-plc" style="display:none">
+              <label class="login-label">PLC</label>
+              <select class="login-input" id="wm-plc-id" onchange="loadWmPlcVars()">
+                <option value="">— Selecciona PLC —</option>
+              </select>
+              <label class="login-label">Variable</label>
+              <select class="login-input" id="wm-var-id">
+                <option value="">— Selecciona variable —</option>
+              </select>
+            </div>
+
+            <!-- Estático config -->
+            <div id="wm-cfg-static" style="display:none">
+              <label class="login-label">Etiquetas (separadas por coma)</label>
+              <input class="login-input" id="wm-static-labels" placeholder="ej. Ene,Feb,Mar"/>
+              <label class="login-label">Valores (separados por coma)</label>
+              <input class="login-input" id="wm-static-values" placeholder="ej. 10,20,30"/>
+            </div>
+
+            <!-- Color -->
+            <label class="login-label">Color principal</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#00d4aa;border-color:#00d4aa;padding:0" onclick="selectColor('#00d4aa',this)"></button>
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#ff4757;border-color:#ff4757;padding:0" onclick="selectColor('#ff4757',this)"></button>
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#ffa502;border-color:#ffa502;padding:0" onclick="selectColor('#ffa502',this)"></button>
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#5352ed;border-color:#5352ed;padding:0" onclick="selectColor('#5352ed',this)"></button>
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#2ed573;border-color:#2ed573;padding:0" onclick="selectColor('#2ed573',this)"></button>
+              <button class="wm-tipo-btn" style="width:36px;height:36px;background:#1e90ff;border-color:#1e90ff;padding:0" onclick="selectColor('#1e90ff',this)"></button>
+            </div>
+          </div>
+
+          <!-- Paso 3: Preview -->
+          <div class="wm-step" id="wm-step-3">
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Vista previa</p>
+            <div class="wm-preview-box" id="wm-preview-box">
+              <span style="color:var(--text-hint)">Cargando preview...</span>
+            </div>
+          </div>
+
+          <!-- Navegación -->
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn-ghost" style="flex:1" id="wm-btn-prev" onclick="wmPrev()" style="display:none">← Atrás</button>
+            <button class="btn-ghost" style="flex:1" onclick="closeWidgetModal()">Cancelar</button>
+            <button class="btn-primary" style="flex:1" id="wm-btn-next" onclick="wmNext()">Siguiente →</button>
+          </div>
+          <p id="wm-msg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+        </div>
+      </div>
+
       <!-- ── ACCESS DENIED VIEW ── -->
       <div id="view-denied" style="display:none;">
         <div class="content-header">
@@ -1448,9 +1748,9 @@ const viewTimers = {};
 
 // RBAC: vistas permitidas por rol
 const ROLE_ALLOWED_VIEWS = {
-  admin:   new Set(['dashboard', 'energia', 'rfid', 'celda', 'quality', 'costos', 'usuarios', 'auditoria', 'plcs']),
-  planta1: new Set(['dashboard', 'energia', 'rfid']),
-  planta2: new Set(['celda', 'quality']),
+  admin:   new Set(['dashboard', 'energia', 'rfid', 'celda', 'quality', 'costos', 'usuarios', 'auditoria', 'plcs', 'dashboards']),
+  planta1: new Set(['dashboard', 'energia', 'rfid', 'dashboards']),
+  planta2: new Set(['celda', 'quality', 'dashboards']),
 };
 
 // Audit state
@@ -1719,9 +2019,11 @@ function _applyLoginSuccess(res, username) {
   setEl('user-name',   res.username || username || '');
   setEl('user-role',   res.role === 'admin' ? 'Acceso total' : res.role);
   setEl('user-avatar', (res.username || username || '?').slice(0,2).toUpperCase());
-  const navP1 = document.getElementById('nav-planta1');
-  const navP2 = document.getElementById('nav-planta2');
-  const navAd = document.getElementById('nav-admin');
+  const navGen = document.getElementById('nav-general');
+  const navP1  = document.getElementById('nav-planta1');
+  const navP2  = document.getElementById('nav-planta2');
+  const navAd  = document.getElementById('nav-admin');
+  if (navGen) navGen.style.display = 'block';
   if (res.role === 'admin') {
     navP1.style.display = 'block'; navP2.style.display = 'block'; navAd.style.display = 'block';
   } else if (res.role === 'planta1') {
@@ -1854,7 +2156,8 @@ const VIEW_LOADERS = {
   costos:    loadCostos,
   usuarios:  loadUsuarios,
   auditoria: loadAuditoria,
-  plcs:      loadPlcs,
+  plcs:       loadPlcs,
+  dashboards: loadDashboards,
 };
 
 function showView(name, btn) {
@@ -1879,6 +2182,8 @@ function showView(name, btn) {
   if (viewTimers.celdaTimers)    { clearInterval(viewTimers.celdaTimers);    delete viewTimers.celdaTimers; }
   if (viewTimers.celdaHistorial) { clearInterval(viewTimers.celdaHistorial); delete viewTimers.celdaHistorial; }
   if (viewTimers.qualityChart)   { clearInterval(viewTimers.qualityChart);   delete viewTimers.qualityChart; }
+  if (viewTimers.dashRefresh)   { clearInterval(viewTimers.dashRefresh);   delete viewTimers.dashRefresh; }
+  if (typeof destroyAllDashCharts === 'function' && name !== 'dashboards') destroyAllDashCharts();
   currentView = name;
 
   document.querySelectorAll('[id^="view-"]').forEach(v => v.style.display = 'none');
@@ -3054,6 +3359,484 @@ function showToast(msg, type) {
   el.className = 'sim-toast sim-toast-' + type + ' sim-toast-show';
   clearTimeout(el._timer);
   el._timer = setTimeout(() => { el.className = 'sim-toast'; }, 2500);
+}
+
+// ── Dashboard Builder ─────────────────────────────────────────────────────────
+let _dashGrid       = null;
+let _currentDashId  = null;
+let _dashCharts     = {};
+let _wmStep         = 1;
+let _wmTipo         = 'line';
+let _wmColor        = '#00d4aa';
+let _editingWidgetId = null;
+let _wmPreviewChart = null;
+
+function destroyAllDashCharts() {
+  Object.values(_dashCharts).forEach(c => { try { c.destroy(); } catch(e) {} });
+  _dashCharts = {};
+}
+
+async function loadDashboards() {
+  document.getElementById('dash-list-view').style.display  = 'block';
+  document.getElementById('dash-editor-view').style.display = 'none';
+  const container = document.getElementById('dash-card-container');
+  container.innerHTML = '<div style="color:var(--text-hint);font-size:13px">Cargando...</div>';
+  try {
+    const dashes = await window.pywebview.api.get_dashboards();
+    if (!dashes || dashes.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:20px 0">No hay dashboards. Crea el primero.</div>';
+      return;
+    }
+    container.innerHTML = dashes.map(d => `
+      <div class="dash-card">
+        <p class="dash-card-title">${esc(d.nombre)}</p>
+        <p class="dash-card-desc">${esc(d.descripcion || '—')}</p>
+        <p class="dash-card-meta">Modificado: ${(d.modificado_en||'').slice(0,16)}</p>
+        <div class="dash-card-actions">
+          <button class="btn-primary" style="flex:1;font-size:12px" onclick="openDashEditor(${d.id})">
+            <i class="ti ti-layout-dashboard"></i> Abrir
+          </button>
+          <button class="btn-ghost" style="font-size:12px"
+            onclick="confirmDeleteDash(${d.id}, ${JSON.stringify(d.nombre)})" title="Eliminar">
+            <i class="ti ti-trash"></i>
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    container.innerHTML = '<div style="color:var(--danger-text);font-size:13px">Error al cargar dashboards</div>';
+  }
+}
+
+async function openDashEditor(dashId) {
+  _currentDashId = dashId;
+  destroyAllDashCharts();
+  document.getElementById('dash-list-view').style.display   = 'none';
+  document.getElementById('dash-editor-view').style.display = 'block';
+  try {
+    const dash = await window.pywebview.api.get_dashboard(dashId);
+    if (!dash || !dash.id) return;
+    document.getElementById('dash-editor-nombre').value = dash.nombre || '';
+
+    const container = document.getElementById('dashboard-grid');
+    if (_dashGrid) { try { _dashGrid.destroy(false); } catch(e) {} _dashGrid = null; }
+    container.innerHTML = '';
+
+    _dashGrid = GridStack.init({
+      column: 12, cellHeight: 80, animate: true, float: false,
+      resizable: { handles: 'se,sw' },
+    }, container);
+
+    (dash.widgets || []).forEach(w => _addWidgetToGrid(w));
+
+    _dashGrid.on('dragstop resizestop', async () => {
+      const positions = (_dashGrid.engine.nodes || []).map(n => ({
+        widget_id: parseInt(n.id), pos_x: n.x||0, pos_y: n.y||0, ancho: n.w||4, alto: n.h||3,
+      }));
+      try { await window.pywebview.api.update_widget_positions(positions); } catch(e) {}
+    });
+
+    if (viewTimers.dashRefresh) clearInterval(viewTimers.dashRefresh);
+    viewTimers.dashRefresh = setInterval(refreshDashWidgets, 30000);
+  } catch(e) { console.error('openDashEditor:', e); }
+}
+
+function _addWidgetToGrid(w) {
+  const bodyId = 'wb-' + w.id;
+  const html = `<div class="widget-card">
+    <div class="widget-header">
+      <span class="widget-title">${esc(w.titulo || w.tipo)}</span>
+      <div class="widget-actions">
+        <button onclick="openWidgetModal(${w.id})" title="Editar"><i class="ti ti-pencil"></i></button>
+        <button onclick="confirmDeleteWidget(${w.id})" title="Eliminar"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>
+    <div class="widget-body" id="${bodyId}">
+      <span style="color:var(--text-hint);font-size:11px">Cargando...</span>
+    </div>
+  </div>`;
+  _dashGrid.addWidget({ x: w.pos_x||0, y: w.pos_y||0, w: w.ancho||4, h: w.alto||3,
+                        id: String(w.id), content: html });
+  renderWidgetData(w);
+}
+
+async function renderWidgetData(w) {
+  const bodyEl = document.getElementById('wb-' + w.id);
+  if (!bodyEl) return;
+  try {
+    const data = await window.pywebview.api.get_widget_data(w.id);
+    _renderWidgetInEl(w, data, bodyEl);
+  } catch(e) {
+    bodyEl.innerHTML = '<span style="color:var(--text-hint);font-size:11px">Sin datos</span>';
+  }
+}
+
+function _renderWidgetInEl(w, data, bodyEl) {
+  let chartCfg = {};
+  try { chartCfg = JSON.parse(w.chart_config || '{}'); } catch(e) {}
+  const color  = chartCfg.color || '#00d4aa';
+  const labels = data.labels || [];
+  const ds0    = data.datasets && data.datasets[0];
+  const values = ds0 ? ds0.data : [];
+  const tipo   = w.tipo;
+
+  if (_dashCharts[w.id]) { try { _dashCharts[w.id].destroy(); } catch(e) {} delete _dashCharts[w.id]; }
+
+  if (tipo === 'kpi') {
+    const last  = data.stats?.last ?? (values.length ? values[values.length-1] : '—');
+    const avg   = data.stats?.avg  ?? null;
+    const trend = (avg !== null && typeof last === 'number')
+      ? (last > avg ? `↑ avg ${avg}` : `↓ avg ${avg}`) : '';
+    bodyEl.innerHTML = `<div class="widget-kpi">
+      <div class="widget-kpi-value" style="color:${color}">
+        ${typeof last === 'number' ? last.toLocaleString('es-MX', {maximumFractionDigits:2}) : last}
+      </div>
+      <div class="widget-kpi-trend">${esc(trend)}</div>
+    </div>`;
+    return;
+  }
+
+  if (tipo === 'table') {
+    if (!labels.length) {
+      bodyEl.innerHTML = '<div style="color:var(--text-hint);font-size:11px;padding:8px">Sin datos</div>';
+      return;
+    }
+    const rows = Array.isArray(values[0]) ? values : [values];
+    bodyEl.innerHTML = `<div class="widget-table-wrap"><table class="widget-table">
+      <thead><tr>${labels.map(l => `<th>${esc(String(l))}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(row =>
+        `<tr>${(Array.isArray(row)?row:[row]).map(c => `<td>${esc(String(c??''))}</td>`).join('')}</tr>`
+      ).join('')}</tbody>
+    </table></div>`;
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  bodyEl.innerHTML = '';
+  bodyEl.appendChild(canvas);
+  const chart = new Chart(canvas, {
+    type: tipo === 'area' ? 'line' : tipo,
+    data: {
+      labels,
+      datasets: [{
+        label: ds0?.label || w.titulo || '',
+        data: values,
+        borderColor: color,
+        backgroundColor: tipo === 'pie'
+          ? ['#00d4aa','#ff4757','#ffa502','#5352ed','#2ed573','#1e90ff']
+          : (tipo === 'area' ? color + '38' : color + '99'),
+        borderWidth: 2, fill: tipo === 'area', tension: 0.3,
+        pointRadius: labels.length > 30 ? 0 : 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: tipo === 'pie', labels: { font: { size: 10 } } } },
+      scales: tipo === 'pie' ? {} : {
+        x: { ticks: { font: { size: 9 }, maxTicksLimit: 6 }, grid: { display: false } },
+        y: { ticks: { font: { size: 9 } }, grid: { color: 'rgba(0,0,0,.05)' } },
+      },
+    },
+  });
+  _dashCharts[w.id] = chart;
+}
+
+async function refreshDashWidgets() {
+  if (!_currentDashId) return;
+  try {
+    const dash = await window.pywebview.api.get_dashboard(_currentDashId);
+    for (const w of (dash?.widgets || [])) await renderWidgetData(w);
+  } catch(e) {}
+}
+
+function exitDashEditor() {
+  if (viewTimers.dashRefresh) { clearInterval(viewTimers.dashRefresh); delete viewTimers.dashRefresh; }
+  destroyAllDashCharts();
+  if (_dashGrid) {
+    try { _dashGrid.destroy(false); } catch(e) {}
+    _dashGrid = null;
+    document.getElementById('dashboard-grid').innerHTML = '';
+  }
+  _currentDashId = null;
+  document.getElementById('dash-list-view').style.display   = 'block';
+  document.getElementById('dash-editor-view').style.display = 'none';
+  loadDashboards();
+}
+
+async function saveDashName() {
+  if (!_currentDashId) return;
+  const nombre = document.getElementById('dash-editor-nombre')?.value.trim();
+  if (!nombre) return;
+  try {
+    const dash = await window.pywebview.api.get_dashboard(_currentDashId);
+    await window.pywebview.api.update_dashboard(_currentDashId, nombre, dash?.descripcion || '');
+    showToast('Guardado', 'success');
+  } catch(e) {}
+}
+
+function openCreateDashModal() {
+  document.getElementById('dash-new-nombre').value    = '';
+  document.getElementById('dash-new-desc').value      = '';
+  document.getElementById('dash-new-msg').textContent = '';
+  document.getElementById('modal-create-dash').style.display = 'flex';
+}
+function closeCreateDashModal() {
+  document.getElementById('modal-create-dash').style.display = 'none';
+}
+
+async function submitCreateDash() {
+  const nombre = document.getElementById('dash-new-nombre')?.value.trim();
+  const desc   = document.getElementById('dash-new-desc')?.value.trim() || '';
+  const msg    = document.getElementById('dash-new-msg');
+  if (!nombre) {
+    msg.style.color = 'var(--danger-text)'; msg.textContent = 'El nombre es obligatorio';
+    return;
+  }
+  try {
+    const r = await window.pywebview.api.create_dashboard(nombre, desc);
+    if (r.ok) {
+      closeCreateDashModal();
+      showToast('Dashboard creado', 'success');
+      openDashEditor(r.dashboard_id);
+    } else {
+      msg.style.color = 'var(--danger-text)'; msg.textContent = r.error || 'Error al crear';
+    }
+  } catch(e) {
+    msg.style.color = 'var(--danger-text)'; msg.textContent = 'Error de comunicación';
+  }
+}
+
+async function confirmDeleteDash(dashId, nombre) {
+  if (!confirm(`¿Eliminar dashboard "${nombre}" y todos sus widgets?`)) return;
+  try {
+    const r = await window.pywebview.api.delete_dashboard(dashId);
+    if (r.ok) { showToast('Dashboard eliminado', 'success'); loadDashboards(); }
+    else showToast('Error: ' + r.error, 'warning');
+  } catch(e) { showToast('Error', 'warning'); }
+}
+
+async function confirmDeleteWidget(widgetId) {
+  if (!confirm('¿Eliminar este widget?')) return;
+  try {
+    const r = await window.pywebview.api.delete_widget(widgetId);
+    if (r.ok) {
+      showToast('Widget eliminado', 'success');
+      if (_dashCharts[widgetId]) {
+        try { _dashCharts[widgetId].destroy(); } catch(e) {}
+        delete _dashCharts[widgetId];
+      }
+      const node = (_dashGrid?.engine.nodes || []).find(n => n.id === String(widgetId));
+      if (node?.el) _dashGrid.removeWidget(node.el);
+    } else showToast('Error: ' + r.error, 'warning');
+  } catch(e) { showToast('Error', 'warning'); }
+}
+
+// ── Widget Modal ──────────────────────────────────────────────────────────────
+
+function openWidgetModal(widgetId) {
+  _editingWidgetId = widgetId;
+  _wmStep  = 1;
+  _wmTipo  = 'line';
+  _wmColor = '#00d4aa';
+  document.getElementById('wm-titulo').value          = '';
+  document.getElementById('wm-ancho').value           = '6';
+  document.getElementById('wm-alto').value            = '3';
+  document.getElementById('wm-measurement').value     = 'sensor-data';
+  document.getElementById('wm-field').value           = 'power_w';
+  document.getElementById('wm-machine').value         = '';
+  document.getElementById('wm-static-labels').value   = '';
+  document.getElementById('wm-static-values').value   = '';
+  document.getElementById('wm-msg').textContent       = '';
+  document.getElementById('wm-title').textContent     = widgetId ? 'Editar Widget' : 'Agregar Widget';
+  document.querySelectorAll('.wm-tipo-btn:not([style*="background"])').forEach(b => b.classList.remove('selected'));
+  onFuenteChange();
+  loadWmPlcs();
+  wmGoStep(1);
+  document.getElementById('modal-widget').style.display = 'flex';
+}
+
+function closeWidgetModal() {
+  if (_wmPreviewChart) { try { _wmPreviewChart.destroy(); } catch(e) {} _wmPreviewChart = null; }
+  document.getElementById('modal-widget').style.display = 'none';
+  _editingWidgetId = null;
+}
+
+function selectTipo(tipo, btn) {
+  _wmTipo = tipo;
+  document.querySelectorAll('.wm-tipo-btn:not([style*="background"])').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function selectColor(color, btn) {
+  _wmColor = color;
+  document.querySelectorAll('.wm-tipo-btn[style*="background"]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function onFuenteChange() {
+  const f = document.getElementById('wm-fuente')?.value || 'influxdb';
+  document.getElementById('wm-cfg-influx').style.display = f === 'influxdb' ? 'block' : 'none';
+  document.getElementById('wm-cfg-plc').style.display    = f === 'plc'      ? 'block' : 'none';
+  document.getElementById('wm-cfg-static').style.display = f === 'static'   ? 'block' : 'none';
+}
+
+async function loadWmPlcs() {
+  const sel = document.getElementById('wm-plc-id');
+  if (!sel) return;
+  try {
+    const plcs = await window.pywebview.api.get_plcs();
+    sel.innerHTML = '<option value="">— Selecciona PLC —</option>' +
+      (plcs || []).map(p => `<option value="${p.id}">${esc(p.nombre)} (${esc(p.ip)})</option>`).join('');
+  } catch(e) {}
+}
+
+async function loadWmPlcVars() {
+  const plcId = document.getElementById('wm-plc-id')?.value;
+  const sel   = document.getElementById('wm-var-id');
+  if (!sel || !plcId) return;
+  sel.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const vars = await window.pywebview.api.get_plc_variables(parseInt(plcId));
+    sel.innerHTML = '<option value="">— Selecciona variable —</option>' +
+      (vars || []).map(v => `<option value="${v.id}">${esc(v.nombre)} [${v.tipo}]</option>`).join('');
+  } catch(e) { sel.innerHTML = '<option value="">Error al cargar</option>'; }
+}
+
+function wmGoStep(n) {
+  _wmStep = n;
+  document.querySelectorAll('.wm-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('wm-step-' + n)?.classList.add('active');
+  document.getElementById('wm-step-ind').textContent = `Paso ${n} / 3`;
+  const prev = document.getElementById('wm-btn-prev');
+  const next = document.getElementById('wm-btn-next');
+  if (prev) prev.style.display = n > 1 ? 'block' : 'none';
+  if (next) next.textContent   = n < 3 ? 'Siguiente →' : 'Guardar';
+  if (n === 3) buildWmPreview();
+}
+
+async function buildWmPreview() {
+  const box = document.getElementById('wm-preview-box');
+  if (!box) return;
+  box.innerHTML = '<span style="color:var(--text-hint)">Generando preview...</span>';
+  if (_wmPreviewChart) { try { _wmPreviewChart.destroy(); } catch(e) {} _wmPreviewChart = null; }
+  const fuente = document.getElementById('wm-fuente')?.value || 'static';
+  const titulo = document.getElementById('wm-titulo')?.value || 'Widget';
+  let labels, values;
+  if (fuente === 'static') {
+    labels = (document.getElementById('wm-static-labels')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+    values = (document.getElementById('wm-static-values')?.value || '').split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+    if (!labels.length) { labels = ['A','B','C']; values = [10,20,30]; }
+  } else {
+    labels = ['10:00','10:05','10:10','10:15','10:20'];
+    values = [1200,1350,1180,1420,1300];
+  }
+  if (_wmTipo === 'kpi') {
+    const last = values.length ? values[values.length-1] : '—';
+    box.innerHTML = `<div class="widget-kpi">
+      <div class="widget-kpi-value" style="color:${_wmColor}">
+        ${typeof last === 'number' ? last.toLocaleString('es-MX',{maximumFractionDigits:2}) : last}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">${esc(titulo)}</div>
+    </div>`;
+    return;
+  }
+  if (_wmTipo === 'table') {
+    box.innerHTML = `<div class="widget-table-wrap" style="max-height:120px">
+      <table class="widget-table">
+        <thead><tr>${labels.map(l => `<th>${esc(String(l))}</th>`).join('')}</tr></thead>
+        <tbody><tr>${values.map(v => `<td>${v}</td>`).join('')}</tr></tbody>
+      </table></div>`;
+    return;
+  }
+  const canvas = document.createElement('canvas');
+  box.innerHTML = '';
+  box.appendChild(canvas);
+  _wmPreviewChart = new Chart(canvas, {
+    type: _wmTipo === 'area' ? 'line' : _wmTipo,
+    data: {
+      labels,
+      datasets: [{
+        label: titulo, data: values,
+        borderColor: _wmColor,
+        backgroundColor: _wmTipo === 'pie'
+          ? ['#00d4aa','#ff4757','#ffa502','#5352ed','#2ed573','#1e90ff']
+          : (_wmTipo === 'area' ? _wmColor + '38' : _wmColor + '99'),
+        borderWidth: 2, fill: _wmTipo === 'area', tension: 0.3,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: _wmTipo === 'pie' ? {} : {
+        x: { ticks: { font: { size: 9 } } },
+        y: { ticks: { font: { size: 9 } } },
+      },
+    },
+  });
+}
+
+function wmPrev() { if (_wmStep > 1) wmGoStep(_wmStep - 1); }
+
+async function wmNext() {
+  if (_wmStep < 3) wmGoStep(_wmStep + 1);
+  else await submitWidget();
+}
+
+async function submitWidget() {
+  const titulo = document.getElementById('wm-titulo')?.value.trim() || _wmTipo;
+  const ancho  = parseInt(document.getElementById('wm-ancho')?.value  || 6);
+  const alto   = parseInt(document.getElementById('wm-alto')?.value   || 3);
+  const fuente = document.getElementById('wm-fuente')?.value || 'static';
+  const msg    = document.getElementById('wm-msg');
+
+  let fCfg = {};
+  if (fuente === 'influxdb') {
+    fCfg = {
+      measurement: document.getElementById('wm-measurement')?.value  || 'sensor-data',
+      field:       document.getElementById('wm-field')?.value        || 'power_w',
+      range:       document.getElementById('wm-range')?.value        || '-1h',
+      aggregation: document.getElementById('wm-aggregation')?.value  || 'mean',
+      window:      document.getElementById('wm-window')?.value       || '5m',
+    };
+    const mid = document.getElementById('wm-machine')?.value.trim();
+    if (mid) fCfg.machine_id = mid;
+  } else if (fuente === 'plc') {
+    fCfg = {
+      plc_id:      parseInt(document.getElementById('wm-plc-id')?.value  || 0),
+      variable_id: parseInt(document.getElementById('wm-var-id')?.value  || 0),
+    };
+  } else {
+    fCfg = {
+      labels: (document.getElementById('wm-static-labels')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
+      values: (document.getElementById('wm-static-values')?.value || '').split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)),
+    };
+  }
+
+  const fStr = JSON.stringify(fCfg);
+  const cStr = JSON.stringify({ color: _wmColor });
+
+  try {
+    let r;
+    if (_editingWidgetId) {
+      const node = (_dashGrid?.engine.nodes || []).find(n => n.id === String(_editingWidgetId));
+      r = await window.pywebview.api.update_widget(
+        _editingWidgetId, titulo, fStr, cStr,
+        node?.x ?? 0, node?.y ?? 0, node?.w ?? ancho, node?.h ?? alto
+      );
+    } else {
+      r = await window.pywebview.api.add_widget(
+        _currentDashId, _wmTipo, titulo, fuente, fStr, cStr, 0, 0, ancho, alto
+      );
+    }
+    if (r.ok) {
+      closeWidgetModal();
+      showToast(_editingWidgetId ? 'Widget actualizado' : 'Widget agregado', 'success');
+      openDashEditor(_currentDashId);
+    } else {
+      if (msg) { msg.style.color = 'var(--danger-text)'; msg.textContent = r.error || 'Error al guardar'; }
+    }
+  } catch(e) {
+    if (msg) { msg.style.color = 'var(--danger-text)'; msg.textContent = 'Error de comunicación'; }
+  }
 }
 </script>
 

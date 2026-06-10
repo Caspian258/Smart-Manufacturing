@@ -61,6 +61,19 @@ from db import (
     get_plc_variables as _db_get_plc_variables,
     add_plc_variable as _db_add_plc_variable,
     remove_plc_variable as _db_remove_plc_variable,
+    init_dashboard_tables,
+    seed_example_dashboards,
+    get_dashboards as _db_get_dashboards,
+    create_dashboard as _db_create_dashboard,
+    update_dashboard as _db_update_dashboard,
+    delete_dashboard as _db_delete_dashboard,
+    get_dashboard as _db_get_dashboard,
+    add_widget as _db_add_widget,
+    update_widget as _db_update_widget,
+    delete_widget as _db_delete_widget,
+    get_widget as _db_get_widget,
+    update_widget_positions as _db_update_widget_positions,
+    _query_widget_influx,
 )
 from health_check import HealthChecker
 from plc_manager import PLCManager
@@ -754,6 +767,163 @@ class Api:
             return {"ok": False, "error": "PLC no encontrado"}
         return self._plc.connect(int(plc_id), plc["ip"], plc["rack"], plc["slot"])
 
+    # ── Dashboard Builder ─────────────────────────────────────────────────
+
+    def get_dashboards(self) -> list:
+        if not self._session:
+            return []
+        return _db_get_dashboards()
+
+    def create_dashboard(self, nombre: str, descripcion: str) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            dash_id = _db_create_dashboard(
+                str(nombre).strip(), str(descripcion).strip(),
+                self._session.get("username", ""),
+            )
+            return {"ok": True, "dashboard_id": dash_id}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def update_dashboard(self, dashboard_id: int, nombre: str,
+                         descripcion: str) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            _db_update_dashboard(int(dashboard_id),
+                                 str(nombre).strip(), str(descripcion).strip())
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def delete_dashboard(self, dashboard_id: int) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            _db_delete_dashboard(int(dashboard_id))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_dashboard(self, dashboard_id: int) -> dict:
+        if not self._session:
+            return {}
+        return _db_get_dashboard(int(dashboard_id)) or {}
+
+    def add_widget(self, dashboard_id: int, tipo: str, titulo: str,
+                   fuente: str, fuente_config: str, chart_config: str,
+                   pos_x: int, pos_y: int, ancho: int, alto: int) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            widget_id = _db_add_widget(
+                int(dashboard_id), str(tipo), str(titulo),
+                str(fuente), str(fuente_config), str(chart_config),
+                int(pos_x), int(pos_y), int(ancho), int(alto),
+            )
+            return {"ok": True, "widget_id": widget_id}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def update_widget(self, widget_id: int, titulo: str,
+                      fuente_config: str, chart_config: str,
+                      pos_x: int, pos_y: int, ancho: int, alto: int) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            _db_update_widget(int(widget_id), str(titulo),
+                              str(fuente_config), str(chart_config),
+                              int(pos_x), int(pos_y), int(ancho), int(alto))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def delete_widget(self, widget_id: int) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            _db_delete_widget(int(widget_id))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_widget_data(self, widget_id: int) -> dict:
+        if not self._session:
+            return {"error": "not_authenticated"}
+        widget = _db_get_widget(int(widget_id))
+        if not widget:
+            return {"labels": [], "datasets": [], "stats": {}}
+        fuente = widget.get("fuente", "static")
+        try:
+            fuente_config = json.loads(widget.get("fuente_config") or "{}")
+        except Exception:
+            fuente_config = {}
+
+        if fuente == "static":
+            labels = fuente_config.get("labels", [])
+            values = fuente_config.get("values", [])
+            nums   = [v for v in values if isinstance(v, (int, float))]
+            stats  = ({"min": min(nums), "max": max(nums),
+                       "avg": round(sum(nums) / len(nums), 2), "last": nums[-1]}
+                      if nums else {})
+            return {"labels": labels,
+                    "datasets": [{"label": widget["titulo"], "data": values}],
+                    "stats": stats}
+
+        if fuente == "plc":
+            plc_id = fuente_config.get("plc_id")
+            var_id = fuente_config.get("variable_id")
+            if not plc_id:
+                return {"labels": [], "datasets": [], "stats": {}}
+            variables = _db_get_plc_variables(int(plc_id))
+            if var_id:
+                variables = [v for v in variables if v["id"] == int(var_id)]
+            vals_map = self._plc.read_all(int(plc_id), variables)
+            labels   = list(vals_map.keys())
+            data     = [v if v is not None else 0 for v in vals_map.values()]
+            return {"labels": labels,
+                    "datasets": [{"label": widget["titulo"], "data": data}],
+                    "stats": {"current": data[0] if data else None}}
+
+        if fuente == "influxdb":
+            from config import ENERGY_MEASUREMENT as _EM
+            result = _query_widget_influx(
+                fuente_config.get("measurement", _EM),
+                fuente_config.get("field", "power_w"),
+                fuente_config.get("machine_id"),
+                fuente_config.get("range", "-1h"),
+                fuente_config.get("aggregation", "mean"),
+                fuente_config.get("window", "5m"),
+            )
+            if not result:
+                return {"labels": [], "datasets": [], "stats": {}}
+            labels = [d["time"] for d in result]
+            values = [d["value"] for d in result]
+            return {"labels": labels,
+                    "datasets": [{"label": fuente_config.get("field", ""), "data": values}],
+                    "stats": {"min":  round(min(values), 2) if values else 0,
+                              "max":  round(max(values), 2) if values else 0,
+                              "avg":  round(sum(values) / len(values), 2) if values else 0,
+                              "last": round(values[-1], 2) if values else 0}}
+
+        return {"labels": [], "datasets": [], "stats": {}}
+
+    def update_widget_positions(self, positions: list) -> dict:
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            _db_update_widget_positions([{
+                "widget_id": int(p["widget_id"]),
+                "pos_x":     int(p.get("pos_x", 0)),
+                "pos_y":     int(p.get("pos_y", 0)),
+                "ancho":     int(p.get("ancho", 4)),
+                "alto":      int(p.get("alto",  3)),
+            } for p in positions])
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
     # ── Cleanup ───────────────────────────────────────────────────────────
 
     def stop(self) -> None:
@@ -786,6 +956,8 @@ def _detect_screen() -> tuple[int, int]:
 def main():
     bootstrap_users()
     init_plc_tables()
+    init_dashboard_tables()
+    seed_example_dashboards()
     api = Api()
 
     sw, sh = _detect_screen()

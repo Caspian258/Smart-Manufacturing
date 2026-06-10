@@ -176,6 +176,213 @@ def remove_plc_variable(variable_id: int) -> None:
     conn.close()
 
 
+# ---------------------------------------------------------------------------
+# Dashboards personalizados
+# ---------------------------------------------------------------------------
+
+def init_dashboard_tables() -> None:
+    """Crear tablas de Dashboards Builder (idempotente)."""
+    conn = get_db()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS dashboards (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre        TEXT    NOT NULL,
+            descripcion   TEXT    DEFAULT '',
+            creado_por    TEXT    DEFAULT '',
+            creado_en     TEXT    DEFAULT (datetime('now')),
+            modificado_en TEXT    DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS dashboard_widgets (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            dashboard_id  INTEGER NOT NULL,
+            tipo          TEXT    NOT NULL,
+            titulo        TEXT    DEFAULT '',
+            fuente        TEXT    DEFAULT 'static',
+            fuente_config TEXT    DEFAULT '{}',
+            chart_config  TEXT    DEFAULT '{}',
+            pos_x         INTEGER DEFAULT 0,
+            pos_y         INTEGER DEFAULT 0,
+            ancho         INTEGER DEFAULT 4,
+            alto          INTEGER DEFAULT 3,
+            FOREIGN KEY (dashboard_id) REFERENCES dashboards(id)
+                ON DELETE CASCADE
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+
+def count_dashboards() -> int:
+    conn = get_db()
+    n = conn.execute("SELECT COUNT(*) FROM dashboards").fetchone()[0]
+    conn.close()
+    return n
+
+
+def get_dashboards() -> list[dict]:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM dashboards ORDER BY modificado_en DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def create_dashboard(nombre: str, descripcion: str,
+                     creado_por: str = '') -> int:
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO dashboards (nombre, descripcion, creado_por) VALUES (?,?,?)",
+        (nombre, descripcion, creado_por),
+    )
+    conn.commit()
+    dash_id = cur.lastrowid
+    conn.close()
+    return dash_id
+
+
+def update_dashboard(dashboard_id: int, nombre: str, descripcion: str) -> None:
+    conn = get_db()
+    conn.execute(
+        "UPDATE dashboards SET nombre=?, descripcion=?, modificado_en=datetime('now') WHERE id=?",
+        (nombre, descripcion, dashboard_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_dashboard(dashboard_id: int) -> None:
+    conn = get_db()
+    conn.execute("DELETE FROM dashboard_widgets WHERE dashboard_id = ?", (dashboard_id,))
+    conn.execute("DELETE FROM dashboards WHERE id = ?", (dashboard_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_dashboard(dashboard_id: int) -> dict | None:
+    conn = get_db()
+    dash = conn.execute(
+        "SELECT * FROM dashboards WHERE id = ?", (dashboard_id,)
+    ).fetchone()
+    if not dash:
+        conn.close()
+        return None
+    widgets = conn.execute(
+        "SELECT * FROM dashboard_widgets WHERE dashboard_id = ? ORDER BY pos_y, pos_x",
+        (dashboard_id,),
+    ).fetchall()
+    conn.close()
+    result = dict(dash)
+    result['widgets'] = [dict(w) for w in widgets]
+    return result
+
+
+def add_widget(dashboard_id: int, tipo: str, titulo: str, fuente: str,
+               fuente_config: str, chart_config: str,
+               pos_x: int, pos_y: int, ancho: int, alto: int) -> int:
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO dashboard_widgets "
+        "(dashboard_id, tipo, titulo, fuente, fuente_config, chart_config, "
+        " pos_x, pos_y, ancho, alto) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (dashboard_id, tipo, titulo, fuente, fuente_config, chart_config,
+         pos_x, pos_y, ancho, alto),
+    )
+    conn.commit()
+    widget_id = cur.lastrowid
+    conn.close()
+    return widget_id
+
+
+def update_widget(widget_id: int, titulo: str, fuente_config: str,
+                  chart_config: str, pos_x: int, pos_y: int,
+                  ancho: int, alto: int) -> None:
+    conn = get_db()
+    conn.execute(
+        "UPDATE dashboard_widgets SET titulo=?, fuente_config=?, chart_config=?, "
+        "pos_x=?, pos_y=?, ancho=?, alto=? WHERE id=?",
+        (titulo, fuente_config, chart_config, pos_x, pos_y, ancho, alto, widget_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_widget(widget_id: int) -> None:
+    conn = get_db()
+    conn.execute("DELETE FROM dashboard_widgets WHERE id = ?", (widget_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_widget(widget_id: int) -> dict | None:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM dashboard_widgets WHERE id = ?", (widget_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_widget_positions(positions: list[dict]) -> None:
+    conn = get_db()
+    for p in positions:
+        conn.execute(
+            "UPDATE dashboard_widgets SET pos_x=?, pos_y=?, ancho=?, alto=? WHERE id=?",
+            (int(p['pos_x']), int(p['pos_y']),
+             int(p['ancho']), int(p['alto']), int(p['widget_id'])),
+        )
+    conn.commit()
+    conn.close()
+
+
+def seed_example_dashboards() -> None:
+    """Inserta 2 dashboards de ejemplo si la tabla está vacía."""
+    if count_dashboards() > 0:
+        return
+    import json as _json
+
+    d1 = create_dashboard(
+        "Monitoreo Energético CIMA",
+        "Potencia, corriente y energía del torno CNC en tiempo real",
+        "admin",
+    )
+    add_widget(d1, 'line', 'Potencia Torno — últimas 2h', 'influxdb',
+               _json.dumps({"measurement": "sensor-data", "field": "power_w",
+                            "machine_id": "torno", "range": "-2h",
+                            "aggregation": "mean", "window": "5m"}),
+               _json.dumps({"color": "#00d4aa"}), 0, 0, 8, 4)
+    add_widget(d1, 'kpi', 'Corriente Actual (A)', 'influxdb',
+               _json.dumps({"measurement": "sensor-data", "field": "irms_a",
+                            "machine_id": "torno", "range": "-5m",
+                            "aggregation": "mean", "window": "1m"}),
+               _json.dumps({"color": "#ffa502"}), 8, 0, 4, 2)
+    add_widget(d1, 'bar', 'Energía por Hora (kWh)', 'influxdb',
+               _json.dumps({"measurement": "sensor-data", "field": "energy_kwh",
+                            "machine_id": "torno", "range": "-8h",
+                            "aggregation": "sum", "window": "1h"}),
+               _json.dumps({"color": "#5352ed"}), 8, 2, 4, 4)
+
+    d2 = create_dashboard(
+        "Resumen Celda 3105",
+        "OEE, calidad de piezas y últimos ciclos de la celda",
+        "admin",
+    )
+    add_widget(d2, 'pie', 'Calidad de Piezas', 'static',
+               _json.dumps({"labels": ["Aprobadas", "Rechazadas"],
+                            "values": [0, 0]}),
+               _json.dumps({"color": "#00d4aa"}), 0, 0, 4, 4)
+    add_widget(d2, 'kpi', 'OEE Actual (%)', 'static',
+               _json.dumps({"labels": ["OEE"], "values": [0]}),
+               _json.dumps({"color": "#ffa502"}), 4, 0, 4, 2)
+    add_widget(d2, 'table', 'Últimos Ciclos', 'static',
+               _json.dumps({"labels": ["Ciclo", "Tipo", "Duración", "Resultado"],
+                            "values": []}),
+               _json.dumps({}), 4, 2, 8, 4)
+
+    log.info("Dashboard Builder: 2 dashboards de ejemplo creados")
+
+
 def log_audit(username: str, accion: str, exitoso: bool,
               ip: str = "127.0.0.1", detalle: str = "") -> None:
     conn = get_db()
@@ -764,6 +971,43 @@ def query_celda3105_ciclos_historial(limit: int = 10) -> list[dict]:
         try: client.close()
         except Exception: pass
         return _demo_celda3105_ciclos_historial()
+
+
+def _query_widget_influx(measurement: str, field: str,
+                         machine_id: str | None, range_str: str,
+                         aggregation: str, window: str) -> list[dict]:
+    """Query genérica para widgets del Dashboard Builder."""
+    client = _influx_client()
+    if client is None:
+        return []
+    machine_filter = (f'|> filter(fn: (r) => r.machine_id == "{machine_id}")'
+                      if machine_id else "")
+    flux = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: {range_str})
+      |> filter(fn: (r) => r._measurement == "{measurement}")
+      {machine_filter}
+      |> filter(fn: (r) => r._field == "{field}")
+      |> aggregateWindow(every: {window}, fn: {aggregation}, createEmpty: false)
+      |> sort(columns: ["_time"], desc: false)
+    """
+    try:
+        tables = client.query_api().query(flux)
+        results = []
+        for table in tables:
+            for record in table.records:
+                val = record.get_value()
+                results.append({
+                    'time':  record.get_time().strftime('%H:%M'),
+                    'value': round(float(val), 3) if val is not None else 0.0,
+                })
+        client.close()
+        return results
+    except Exception as exc:
+        log.warning("_query_widget_influx: %s", exc)
+        try: client.close()
+        except Exception: pass
+        return []
 
 
 def subscribe_celda3105_mqtt(callback) -> None:

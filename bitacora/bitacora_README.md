@@ -2,6 +2,18 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #084 — Dashboard Builder — widgets drag&drop con Chart.js y gridstack
+- **Fecha**: 2026-06-09 12:00
+- **Acción**: Implementación completa del módulo Dashboard Builder (Módulo 2). Permite crear dashboards personalizados con widgets drag&drop, redimensionables, conectados a InfluxDB, PLC o datos estáticos.
+- **Estado**: ✅ Completado
+- **Archivos modificados**:
+  - `app/db.py` — Tablas `dashboards` y `dashboard_widgets` + CRUD completo + `seed_example_dashboards()` + `_query_widget_influx()` — ya implementado en sesión anterior
+  - `app/main.py` — Métodos API: get_dashboards, create_dashboard, update_dashboard, delete_dashboard, get_dashboard, add_widget, update_widget, delete_widget, get_widget_data (fuentes: influxdb/plc/static), update_widget_positions — ya implementado en sesión anterior
+  - `app/templates/index.html` — JS Dashboard Builder completo: loadDashboards, openDashEditor, _addWidgetToGrid, renderWidgetData, _renderWidgetInEl, refreshDashWidgets (30s), exitDashEditor, saveDashName, CRUD modales, openWidgetModal (3 pasos: tipo → fuente → preview), selectTipo/selectColor, wmNext/wmPrev/wmGoStep, submitWidget, confirmDeleteDash/Widget. Tipos: line, area, bar, pie (Chart.js), kpi (HTML), table (HTML). Gridstack 10 con 12 columnas y cellHeight 80px.
+- **Próximo paso**: Probar con datos reales de InfluxDB y PLC; extender con exportación PDF de dashboards
+
+---
+
 ## ENTRADA #083 — Módulo Multi-PLC via python-snap7
 - **Fecha**: 2026-06-09 00:00
 - **Acción**: Implementación completa del módulo de gestión de PLCs S7 adicionales, conexión directa via python-snap7 desde la app PyWebView (independiente del Node-RED de Celda 3105).
