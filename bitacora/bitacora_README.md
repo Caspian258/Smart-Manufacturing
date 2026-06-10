@@ -2,6 +2,18 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #092 — Calibración SCT-013: umbral empírico post-apagón RPi5
+- **Fecha**: 2026-06-10
+- **Acción**: Tras apagón durante sesión de calibración, se verificó el estado del repo y se completó la calibración pendiente:
+  - Ruido ADC medido con foco apagado: irms_raw max = 0.0593A (5 muestras)
+  - Nuevo umbral: 0.0593 × 1.5 = **SCT_MIN_CURRENT = 0.09f** (antes 0.15f)
+  - Eliminado `[DEBUG SCT]` de main.cpp
+  - Firmware release flasheado y verificado (solo `[ENERGY]`, sin debug)
+  - Commit: `968b70b` — pusheado a GitHub
+- **Estado**: ✅ Completado
+- **Archivos modificados**: `firmware/esp32-s3/include/config.h`, `firmware/esp32-s3/src/main.cpp`
+- **Próximo paso**: Probar con foco encendido para confirmar que 0.09A detecta la carga correctamente
+
 ## ENTRADA #091 — Dashboard Builder: corrección measurement cima_energy
 - **Fecha**: 2026-06-10
 - **Acción**: El Dashboard Builder referenciaba `"sensor-data"` como measurement, pero el measurement real del ESP32 en InfluxDB es `"cima_energy"`. Corregido en 3 lugares:
