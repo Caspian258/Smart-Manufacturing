@@ -74,6 +74,108 @@ def init_db() -> None:
     conn.close()
 
 
+def init_plc_tables() -> None:
+    """Crear tablas de PLCs adicionales (idempotente)."""
+    conn = get_db()
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS plcs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre      TEXT    NOT NULL,
+            ip          TEXT    NOT NULL UNIQUE,
+            rack        INTEGER DEFAULT 0,
+            slot        INTEGER DEFAULT 1,
+            descripcion TEXT    DEFAULT '',
+            activo      INTEGER DEFAULT 1,
+            creado_en   TEXT    DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS plc_variables (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            plc_id      INTEGER NOT NULL,
+            nombre      TEXT    NOT NULL,
+            direccion   TEXT    NOT NULL,
+            tipo        TEXT    DEFAULT 'bool',
+            descripcion TEXT    DEFAULT '',
+            activo      INTEGER DEFAULT 1,
+            FOREIGN KEY (plc_id) REFERENCES plcs(id)
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+
+def get_plcs() -> list[dict]:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM plcs ORDER BY id"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_plc(nombre: str, ip: str, rack: int, slot: int,
+            descripcion: str) -> int:
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO plcs (nombre, ip, rack, slot, descripcion) VALUES (?,?,?,?,?)",
+        (nombre, ip, rack, slot, descripcion),
+    )
+    conn.commit()
+    plc_id = cur.lastrowid
+    conn.close()
+    return plc_id
+
+
+def remove_plc(plc_id: int) -> None:
+    conn = get_db()
+    conn.execute("DELETE FROM plc_variables WHERE plc_id = ?", (plc_id,))
+    conn.execute("DELETE FROM plcs WHERE id = ?", (plc_id,))
+    conn.commit()
+    conn.close()
+
+
+def update_plc(plc_id: int, nombre: str, descripcion: str,
+               activo: int) -> None:
+    conn = get_db()
+    conn.execute(
+        "UPDATE plcs SET nombre=?, descripcion=?, activo=? WHERE id=?",
+        (nombre, descripcion, int(activo), plc_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_plc_variables(plc_id: int) -> list[dict]:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM plc_variables WHERE plc_id = ? AND activo = 1 ORDER BY id",
+        (plc_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_plc_variable(plc_id: int, nombre: str, direccion: str,
+                     tipo: str, descripcion: str) -> int:
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO plc_variables (plc_id, nombre, direccion, tipo, descripcion)"
+        " VALUES (?,?,?,?,?)",
+        (plc_id, nombre, direccion, tipo, descripcion),
+    )
+    conn.commit()
+    var_id = cur.lastrowid
+    conn.close()
+    return var_id
+
+
+def remove_plc_variable(variable_id: int) -> None:
+    conn = get_db()
+    conn.execute("DELETE FROM plc_variables WHERE id = ?", (variable_id,))
+    conn.commit()
+    conn.close()
+
+
 def log_audit(username: str, accion: str, exitoso: bool,
               ip: str = "127.0.0.1", detalle: str = "") -> None:
     conn = get_db()

@@ -691,6 +691,9 @@
         <button class="nav-item" onclick="showView('auditoria', this)">
           <i class="ti ti-list"></i> Auditoría
         </button>
+        <button class="nav-item" onclick="showView('plcs', this)">
+          <i class="ti ti-cpu"></i> PLCs
+        </button>
       </div>
 
       <div class="sidebar-footer">
@@ -1302,6 +1305,118 @@
         </div>
       </div>
 
+      <!-- ── PLCs VIEW (admin) ── -->
+      <div id="view-plcs" style="display:none;">
+        <div class="content-header">
+          <div>
+            <p class="content-title">Gestión de PLCs S7</p>
+            <p class="content-sub">Conexión directa via python-snap7 — PLCs adicionales e independientes de Node-RED</p>
+          </div>
+          <button class="btn-primary" onclick="openAddPlcModal()"><i class="ti ti-plus"></i> Agregar PLC</button>
+        </div>
+
+        <!-- Panel A: Lista de PLCs -->
+        <div class="card" id="plc-list-panel">
+          <div class="card-title">PLCs registrados <span class="card-hint" id="plc-count-hint"></span></div>
+          <table class="view-table">
+            <thead><tr>
+              <th>Nombre</th><th>IP</th><th>Estado</th><th>Rack / Slot</th><th>Descripción</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="plc-list-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Panel B: Variables del PLC seleccionado -->
+        <div class="card" id="plc-vars-panel" style="display:none;">
+          <div class="card-title">
+            <span>Variables — <span id="plc-vars-name" style="color:var(--accent)">—</span>
+              <span id="plc-vars-ip" style="font-size:11px;color:var(--text-hint);margin-left:6px"></span>
+              <span id="plc-vars-status-badge" class="badge badge-danger" style="margin-left:8px"><span class="badge-dot"></span>—</span>
+            </span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn-ghost" onclick="closePlcVarsPanel()">← Volver</button>
+              <button class="btn-primary" onclick="openAddVarModal()"><i class="ti ti-plus"></i> Agregar variable</button>
+            </div>
+          </div>
+          <table class="view-table">
+            <thead><tr>
+              <th>Nombre</th><th>Dirección</th><th>Tipo</th><th>Valor actual</th><th>Descripción</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="plc-vars-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Selecciona un PLC</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Panel C: Vista en vivo -->
+        <div class="card" id="plc-live-panel" style="display:none;">
+          <div class="card-title">
+            Vista en vivo — <span id="plc-live-name" style="color:var(--accent)">—</span>
+            <span style="font-size:11px;color:var(--text-hint)" id="plc-live-ts"></span>
+          </div>
+          <div id="plc-live-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <p style="color:var(--text-hint);font-size:12px">Sin variables</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Agregar PLC -->
+      <div id="modal-add-plc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border-radius:var(--radius-lg);padding:24px 28px;width:420px;max-width:95vw;">
+          <p style="font-size:15px;font-weight:500;margin-bottom:16px">Agregar PLC S7</p>
+          <label class="login-label">Nombre</label>
+          <input class="login-input" id="plc-add-nombre" placeholder="ej. PLC Línea 2" />
+          <label class="login-label">IP</label>
+          <input class="login-input" id="plc-add-ip" placeholder="192.168.1.XX" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label class="login-label">Rack</label>
+              <input class="login-input" id="plc-add-rack" type="number" value="0" min="0" />
+            </div>
+            <div>
+              <label class="login-label">Slot</label>
+              <input class="login-input" id="plc-add-slot" type="number" value="1" min="0" />
+            </div>
+          </div>
+          <label class="login-label">Descripción (opcional)</label>
+          <input class="login-input" id="plc-add-desc" placeholder="ej. Controlador fresadora CNC" />
+          <div id="plc-test-result" style="margin-bottom:10px;font-size:12px;min-height:20px"></div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-ghost" style="flex:1" onclick="testPlcConnection()"><i class="ti ti-plug"></i> Probar</button>
+            <button class="btn-ghost" style="flex:1" onclick="closeAddPlcModal()">Cancelar</button>
+            <button class="btn-primary" style="flex:1" onclick="submitAddPlc()">Guardar</button>
+          </div>
+          <p id="plc-add-msg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+        </div>
+      </div>
+
+      <!-- Modal Agregar Variable -->
+      <div id="modal-add-var" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border-radius:var(--radius-lg);padding:24px 28px;width:420px;max-width:95vw;">
+          <p style="font-size:15px;font-weight:500;margin-bottom:16px">Agregar variable S7</p>
+          <label class="login-label">Nombre</label>
+          <input class="login-input" id="var-add-nombre" placeholder="ej. Temperatura Motor" />
+          <label class="login-label">Dirección S7</label>
+          <input class="login-input" id="var-add-dir" placeholder="ej. DB1.DBX0.0 / M30.5 / MW10" oninput="previewVarValue()" />
+          <label class="login-label">Tipo</label>
+          <select class="login-input" id="var-add-tipo" onchange="previewVarValue()">
+            <option value="bool">bool</option>
+            <option value="int">int</option>
+            <option value="real">real</option>
+          </select>
+          <label class="login-label">Descripción (opcional)</label>
+          <input class="login-input" id="var-add-desc" placeholder="ej. Temperatura en °C" />
+          <p id="var-preview" style="font-size:11px;color:var(--text-hint);margin-bottom:8px;min-height:16px"></p>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-ghost" style="flex:1" onclick="closeAddVarModal()">Cancelar</button>
+            <button class="btn-primary" style="flex:1" onclick="submitAddVar()">Guardar</button>
+          </div>
+          <p id="var-add-msg" style="font-size:12px;margin-top:8px;min-height:16px"></p>
+        </div>
+      </div>
+
       <!-- ── ACCESS DENIED VIEW ── -->
       <div id="view-denied" style="display:none;">
         <div class="content-header">
@@ -1333,7 +1448,7 @@ const viewTimers = {};
 
 // RBAC: vistas permitidas por rol
 const ROLE_ALLOWED_VIEWS = {
-  admin:   new Set(['dashboard', 'energia', 'rfid', 'celda', 'quality', 'costos', 'usuarios', 'auditoria']),
+  admin:   new Set(['dashboard', 'energia', 'rfid', 'celda', 'quality', 'costos', 'usuarios', 'auditoria', 'plcs']),
   planta1: new Set(['dashboard', 'energia', 'rfid']),
   planta2: new Set(['celda', 'quality']),
 };
@@ -1739,6 +1854,7 @@ const VIEW_LOADERS = {
   costos:    loadCostos,
   usuarios:  loadUsuarios,
   auditoria: loadAuditoria,
+  plcs:      loadPlcs,
 };
 
 function showView(name, btn) {
@@ -2613,6 +2729,294 @@ function auditNext() {
     (!filterAction || l.accion   === filterAction)
   ).length;
   if (auditPage < Math.ceil(total / AUDIT_PER)) { auditPage++; renderAudit(); }
+}
+
+// ── VIEW: PLCs ────────────────────────────────────────────────────────────────
+let currentPlcId   = null;
+let currentPlcName = '';
+let plcLiveInterval = null;
+
+async function loadPlcs() {
+  if (plcLiveInterval) { clearInterval(plcLiveInterval); plcLiveInterval = null; }
+  document.getElementById('plc-vars-panel').style.display = 'none';
+  document.getElementById('plc-live-panel').style.display = 'none';
+  document.getElementById('plc-list-panel').style.display = 'block';
+  try {
+    const plcs = await window.pywebview.api.get_plcs();
+    const tbody = document.getElementById('plc-list-tbody');
+    const hint  = document.getElementById('plc-count-hint');
+    if (hint) hint.textContent = `(${(plcs || []).length})`;
+    if (!plcs || !plcs.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Sin PLCs registrados — agrega uno con el botón superior</td></tr>';
+      return;
+    }
+    tbody.innerHTML = plcs.map(p => {
+      const st = p.status || 'disconnected';
+      const badgeClass = st === 'connected' ? 'badge-success' : (st === 'error' ? 'badge-danger' : 'badge-warning');
+      const badgeLabel = st === 'connected' ? 'Conectado' : (st === 'error' ? 'Error' : 'Desconectado');
+      return `<tr>
+        <td style="font-weight:500">${esc(p.nombre)}</td>
+        <td style="font-family:monospace;font-size:12px">${esc(p.ip)}</td>
+        <td><span class="badge ${badgeClass}"><span class="badge-dot"></span>${badgeLabel}</span></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${p.rack} / ${p.slot}</td>
+        <td style="font-size:12px;color:var(--text-hint)">${esc(p.descripcion || '—')}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="reconnectPlc(${p.id})">Reconectar</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="openPlcVarsPanel(${p.id},'${esc(p.nombre)}','${esc(p.ip)}','${badgeClass}','${badgeLabel}')">Variables</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--danger-text)" onclick="confirmRemovePlc(${p.id},'${esc(p.nombre)}')">Eliminar</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('plc-list-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--danger-text)">Error cargando PLCs</td></tr>';
+  }
+}
+
+async function reconnectPlc(plcId) {
+  try {
+    showToast('Reconectando PLC...', 'info');
+    const r = await window.pywebview.api.reconnect_plc(plcId);
+    showToast(r.ok ? 'PLC reconectado' : ('Error: ' + r.error), r.ok ? 'success' : 'warning');
+    loadPlcs();
+  } catch(e) { showToast('Error de conexión', 'warning'); }
+}
+
+async function confirmRemovePlc(plcId, nombre) {
+  if (!confirm(`¿Eliminar PLC "${nombre}" y todas sus variables?`)) return;
+  try {
+    const r = await window.pywebview.api.remove_plc(plcId);
+    if (r.ok) { showToast('PLC eliminado', 'success'); loadPlcs(); }
+    else showToast('Error: ' + r.error, 'warning');
+  } catch(e) { showToast('Error de conexión', 'warning'); }
+}
+
+function openAddPlcModal() {
+  ['plc-add-nombre','plc-add-ip','plc-add-desc'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const rack = document.getElementById('plc-add-rack'); if (rack) rack.value = '0';
+  const slot = document.getElementById('plc-add-slot'); if (slot) slot.value = '1';
+  setEl('plc-test-result', '');
+  setEl('plc-add-msg', '');
+  const m = document.getElementById('modal-add-plc');
+  if (m) m.style.display = 'flex';
+}
+
+function closeAddPlcModal() {
+  const m = document.getElementById('modal-add-plc');
+  if (m) m.style.display = 'none';
+}
+
+async function testPlcConnection() {
+  const ip   = document.getElementById('plc-add-ip')?.value.trim();
+  const rack = parseInt(document.getElementById('plc-add-rack')?.value) || 0;
+  const slot = parseInt(document.getElementById('plc-add-slot')?.value) || 1;
+  const res  = document.getElementById('plc-test-result');
+  if (!ip) { if (res) { res.style.color='var(--danger-text)'; res.textContent='Ingresa una IP'; } return; }
+  if (res) { res.style.color='var(--text-hint)'; res.textContent='Probando conexión...'; }
+  try {
+    const r = await window.pywebview.api.test_plc_connection(ip, rack, slot);
+    if (res) {
+      if (r.ok) {
+        res.style.color = 'var(--success-text)';
+        res.textContent = '✓ Conectado — ' + (r.cpu_info || 'OK');
+      } else {
+        res.style.color = 'var(--danger-text)';
+        res.textContent = '✗ ' + (r.error || 'Sin respuesta');
+      }
+    }
+  } catch(e) { if (res) { res.style.color='var(--danger-text)'; res.textContent='Error de comunicación'; } }
+}
+
+async function submitAddPlc() {
+  const nombre = document.getElementById('plc-add-nombre')?.value.trim();
+  const ip     = document.getElementById('plc-add-ip')?.value.trim();
+  const rack   = parseInt(document.getElementById('plc-add-rack')?.value) || 0;
+  const slot   = parseInt(document.getElementById('plc-add-slot')?.value) || 1;
+  const desc   = document.getElementById('plc-add-desc')?.value.trim() || '';
+  const msg    = document.getElementById('plc-add-msg');
+  if (!nombre || !ip) {
+    if (msg) { msg.style.color='var(--danger-text)'; msg.textContent='Nombre e IP son obligatorios'; }
+    return;
+  }
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+    if (msg) { msg.style.color='var(--danger-text)'; msg.textContent='IP inválida — usa formato 192.168.1.X'; }
+    return;
+  }
+  try {
+    const r = await window.pywebview.api.add_plc(nombre, ip, rack, slot, desc);
+    if (r.ok) {
+      if (msg) { msg.style.color='var(--success-text)'; msg.textContent='PLC agregado' + (r.connected ? ' y conectado' : ' (sin conexión aún)'); }
+      setTimeout(() => { closeAddPlcModal(); loadPlcs(); }, 1200);
+    } else {
+      if (msg) { msg.style.color='var(--danger-text)'; msg.textContent=r.error||'Error al guardar'; }
+    }
+  } catch(e) { if (msg) { msg.style.color='var(--danger-text)'; msg.textContent='Error de comunicación'; } }
+}
+
+async function openPlcVarsPanel(plcId, nombre, ip, badgeClass, badgeLabel) {
+  currentPlcId   = plcId;
+  currentPlcName = nombre;
+  if (plcLiveInterval) { clearInterval(plcLiveInterval); plcLiveInterval = null; }
+  document.getElementById('plc-list-panel').style.display = 'none';
+  document.getElementById('plc-vars-panel').style.display  = 'block';
+  document.getElementById('plc-live-panel').style.display  = 'block';
+  setEl('plc-vars-name', nombre);
+  setEl('plc-vars-ip',   ip);
+  setEl('plc-live-name', nombre);
+  const badge = document.getElementById('plc-vars-status-badge');
+  if (badge) { badge.className = 'badge ' + badgeClass; badge.innerHTML = `<span class="badge-dot"></span>${badgeLabel}`; }
+  await loadPlcVariables();
+  plcLiveInterval = setInterval(refreshPlcLive, 1000);
+}
+
+function closePlcVarsPanel() {
+  currentPlcId = null;
+  currentPlcName = '';
+  if (plcLiveInterval) { clearInterval(plcLiveInterval); plcLiveInterval = null; }
+  document.getElementById('plc-vars-panel').style.display = 'none';
+  document.getElementById('plc-live-panel').style.display = 'none';
+  document.getElementById('plc-list-panel').style.display = 'block';
+  loadPlcs();
+}
+
+async function loadPlcVariables() {
+  if (!currentPlcId) return;
+  try {
+    const vars  = await window.pywebview.api.get_plc_variables(currentPlcId);
+    const tbody = document.getElementById('plc-vars-tbody');
+    if (!vars || !vars.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-hint)">Sin variables — agrega una con el botón superior</td></tr>';
+      document.getElementById('plc-live-cards').innerHTML = '<p style="color:var(--text-hint);font-size:12px">Sin variables</p>';
+      return;
+    }
+    tbody.innerHTML = vars.map(v => `<tr>
+      <td style="font-weight:500">${esc(v.nombre)}</td>
+      <td style="font-family:monospace;font-size:12px">${esc(v.direccion)}</td>
+      <td><span class="badge badge-info" style="font-size:10px">${esc(v.tipo)}</span></td>
+      <td id="vval-${v.id}" style="font-family:monospace;font-size:12px;color:var(--text-hint)">—</td>
+      <td style="font-size:12px;color:var(--text-hint)">${esc(v.descripcion||'—')}</td>
+      <td><button class="btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--danger-text)" onclick="confirmRemoveVar(${v.id},'${esc(v.nombre)}')">Eliminar</button></td>
+    </tr>`).join('');
+    renderPlcLiveCards(vars, {});
+  } catch(e) {}
+}
+
+function renderPlcLiveCards(vars, values) {
+  const container = document.getElementById('plc-live-cards');
+  if (!vars || !vars.length) { container.innerHTML = '<p style="color:var(--text-hint);font-size:12px">Sin variables</p>'; return; }
+  container.innerHTML = vars.map(v => {
+    const val = values[v.nombre];
+    let display = '';
+    if (val === null || val === undefined) {
+      display = '<span style="color:var(--text-hint)">—</span>';
+    } else if (v.tipo === 'bool') {
+      const on = val === true || val === 1;
+      display = `<span style="font-size:22px;color:${on?'var(--accent)':'var(--danger-text)'}">●</span><br><span style="font-size:11px">${on?'ON':'OFF'}</span>`;
+    } else {
+      display = `<span style="font-size:20px;font-weight:600;font-family:monospace">${typeof val==='number'?val.toFixed(v.tipo==='real'?2:0):val}</span>`;
+    }
+    return `<div style="background:var(--bg);border-radius:var(--radius-md);padding:12px 10px;text-align:center;border:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;font-weight:500">${esc(v.nombre)}</div>
+      <div id="lcard-${v.id}">${display}</div>
+      <div style="font-size:10px;color:var(--text-hint);margin-top:4px">${esc(v.direccion)} · ${esc(v.tipo)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshPlcLive() {
+  if (!currentPlcId) return;
+  try {
+    const values = await window.pywebview.api.get_plc_live_data(currentPlcId);
+    const vars   = await window.pywebview.api.get_plc_variables(currentPlcId);
+    const ts = document.getElementById('plc-live-ts');
+    if (ts) ts.textContent = '· ' + new Date().toLocaleTimeString();
+    if (!vars || !vars.length) return;
+    vars.forEach(v => {
+      const val = values[v.nombre];
+      const tableCell = document.getElementById('vval-' + v.id);
+      const liveCard  = document.getElementById('lcard-' + v.id);
+      let fmtVal = '—';
+      let cardHtml = '<span style="color:var(--text-hint)">—</span>';
+      if (val !== null && val !== undefined) {
+        if (v.tipo === 'bool') {
+          const on = val === true || val === 1;
+          fmtVal   = on ? 'TRUE' : 'FALSE';
+          cardHtml = `<span style="font-size:22px;color:${on?'var(--accent)':'var(--danger-text)'}">●</span><br><span style="font-size:11px">${on?'ON':'OFF'}</span>`;
+        } else {
+          fmtVal   = typeof val==='number' ? val.toFixed(v.tipo==='real'?2:0) : String(val);
+          cardHtml = `<span style="font-size:20px;font-weight:600;font-family:monospace">${fmtVal}</span>`;
+        }
+      }
+      if (tableCell) tableCell.textContent = fmtVal;
+      if (liveCard)  liveCard.innerHTML    = cardHtml;
+    });
+  } catch(e) {}
+}
+
+function openAddVarModal() {
+  if (!currentPlcId) return;
+  ['var-add-nombre','var-add-dir','var-add-desc'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const tipo = document.getElementById('var-add-tipo'); if (tipo) tipo.value = 'bool';
+  setEl('var-preview', '');
+  setEl('var-add-msg', '');
+  const m = document.getElementById('modal-add-var');
+  if (m) m.style.display = 'flex';
+}
+
+function closeAddVarModal() {
+  const m = document.getElementById('modal-add-var');
+  if (m) m.style.display = 'none';
+}
+
+async function previewVarValue() {
+  const dir  = document.getElementById('var-add-dir')?.value.trim();
+  const tipo = document.getElementById('var-add-tipo')?.value || 'bool';
+  const prev = document.getElementById('var-preview');
+  if (!prev || !dir || !currentPlcId) return;
+  prev.textContent = 'Leyendo...';
+  try {
+    const vals = await window.pywebview.api.get_plc_live_data(currentPlcId);
+    prev.textContent = 'PLC conectado — ingresa la dirección exacta para previsualizar';
+  } catch(e) { prev.textContent = 'PLC no disponible'; }
+}
+
+async function submitAddVar() {
+  const nombre = document.getElementById('var-add-nombre')?.value.trim();
+  const dir    = document.getElementById('var-add-dir')?.value.trim();
+  const tipo   = document.getElementById('var-add-tipo')?.value || 'bool';
+  const desc   = document.getElementById('var-add-desc')?.value.trim() || '';
+  const msg    = document.getElementById('var-add-msg');
+  if (!nombre || !dir) {
+    if (msg) { msg.style.color='var(--danger-text)'; msg.textContent='Nombre y dirección son obligatorios'; }
+    return;
+  }
+  try {
+    const r = await window.pywebview.api.add_plc_variable(currentPlcId, nombre, dir, tipo, desc);
+    if (r.ok) {
+      if (msg) { msg.style.color='var(--success-text)'; msg.textContent='Variable agregada'; }
+      setTimeout(() => { closeAddVarModal(); loadPlcVariables(); }, 900);
+    } else {
+      if (msg) { msg.style.color='var(--danger-text)'; msg.textContent=r.error||'Error al guardar'; }
+    }
+  } catch(e) { if (msg) { msg.style.color='var(--danger-text)'; msg.textContent='Error de comunicación'; } }
+}
+
+async function confirmRemoveVar(varId, nombre) {
+  if (!confirm(`¿Eliminar variable "${nombre}"?`)) return;
+  try {
+    const r = await window.pywebview.api.remove_plc_variable(varId);
+    if (r.ok) { showToast('Variable eliminada', 'success'); loadPlcVariables(); }
+    else showToast('Error: ' + r.error, 'warning');
+  } catch(e) { showToast('Error de conexión', 'warning'); }
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── Tecla Z — Simulación RFID ────────────────────────────────────────────────

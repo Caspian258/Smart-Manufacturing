@@ -53,8 +53,17 @@ from db import (
     get_all_users,
     delete_user as _db_delete_user,
     get_audit_logs as _db_get_audit_logs,
+    init_plc_tables,
+    get_plcs as _db_get_plcs,
+    add_plc as _db_add_plc,
+    remove_plc as _db_remove_plc,
+    update_plc as _db_update_plc,
+    get_plc_variables as _db_get_plc_variables,
+    add_plc_variable as _db_add_plc_variable,
+    remove_plc_variable as _db_remove_plc_variable,
 )
 from health_check import HealthChecker
+from plc_manager import PLCManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +79,7 @@ class Api:
         self._session: dict | None = None
         self._hc = HealthChecker()
         self._hc.start()
+        self._plc = PLCManager()
         self._active_cycle: dict | None = None
         self._rfid_mqtt: mqtt_lib.Client | None = None
         self._connect_rfid_mqtt()
@@ -648,10 +658,107 @@ class Api:
             log.error("export_rfid_pdf: %s", exc)
             return {"error": str(exc)}
 
+    # ── PLCs (admin) ──────────────────────────────────────────────────────
+
+    def get_plcs(self) -> list:
+        if not self._session or self._session.get("rol") != "admin":
+            return []
+        plcs = _db_get_plcs()
+        for p in plcs:
+            p["status"] = self._plc.get_status(p["id"])
+        return plcs
+
+    def add_plc(self, nombre: str, ip: str, rack: int, slot: int,
+                descripcion: str) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        try:
+            plc_id = _db_add_plc(
+                str(nombre).strip(), str(ip).strip(),
+                int(rack), int(slot), str(descripcion).strip()
+            )
+            conn_result = self._plc.connect(plc_id, str(ip).strip(), int(rack), int(slot))
+            return {"ok": True, "plc_id": plc_id,
+                    "connected": conn_result["ok"], "error": conn_result["error"]}
+        except Exception as exc:
+            log.error("add_plc: %s", exc)
+            return {"ok": False, "error": str(exc)}
+
+    def remove_plc(self, plc_id: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        try:
+            self._plc.disconnect(int(plc_id))
+            _db_remove_plc(int(plc_id))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def test_plc_connection(self, ip: str, rack: int, slot: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos", "cpu_info": ""}
+        return self._plc.test_connection(str(ip).strip(), int(rack), int(slot))
+
+    def update_plc(self, plc_id: int, nombre: str, descripcion: str,
+                   activo: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        try:
+            _db_update_plc(int(plc_id), str(nombre).strip(),
+                           str(descripcion).strip(), int(activo))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_plc_variables(self, plc_id: int) -> list:
+        if not self._session or self._session.get("rol") != "admin":
+            return []
+        return _db_get_plc_variables(int(plc_id))
+
+    def add_plc_variable(self, plc_id: int, nombre: str, direccion: str,
+                         tipo: str, descripcion: str) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        try:
+            var_id = _db_add_plc_variable(
+                int(plc_id), str(nombre).strip(), str(direccion).strip(),
+                str(tipo).strip(), str(descripcion).strip()
+            )
+            return {"ok": True, "variable_id": var_id}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def remove_plc_variable(self, variable_id: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        try:
+            _db_remove_plc_variable(int(variable_id))
+            return {"ok": True}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def get_plc_live_data(self, plc_id: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {}
+        variables = _db_get_plc_variables(int(plc_id))
+        if not variables:
+            return {}
+        return self._plc.read_all(int(plc_id), variables)
+
+    def reconnect_plc(self, plc_id: int) -> dict:
+        if not self._session or self._session.get("rol") != "admin":
+            return {"ok": False, "error": "Sin permisos"}
+        plcs = _db_get_plcs()
+        plc = next((p for p in plcs if p["id"] == int(plc_id)), None)
+        if not plc:
+            return {"ok": False, "error": "PLC no encontrado"}
+        return self._plc.connect(int(plc_id), plc["ip"], plc["rack"], plc["slot"])
+
     # ── Cleanup ───────────────────────────────────────────────────────────
 
     def stop(self) -> None:
         self._hc.stop()
+        self._plc.disconnect_all()
         for client in (self._rfid_mqtt, self._energy_mqtt):
             if client:
                 try:
@@ -678,6 +785,7 @@ def _detect_screen() -> tuple[int, int]:
 
 def main():
     bootstrap_users()
+    init_plc_tables()
     api = Api()
 
     sw, sh = _detect_screen()

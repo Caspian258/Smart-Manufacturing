@@ -2,6 +2,19 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #083 — Módulo Multi-PLC via python-snap7
+- **Fecha**: 2026-06-09 00:00
+- **Acción**: Implementación completa del módulo de gestión de PLCs S7 adicionales, conexión directa via python-snap7 desde la app PyWebView (independiente del Node-RED de Celda 3105).
+- **Estado**: ✅ Completado
+- **Archivos modificados**:
+  - `app/plc_manager.py` — Clase PLCManager: connect/disconnect/test_connection/read_variable/read_all/start_polling/stop_polling/get_cached_values/get_status + parser de direcciones S7 (DBX, DBW, DBD, M, MW, MD, I, IW, Q, QW)
+  - `app/db.py` — Tablas `plcs` y `plc_variables` + funciones CRUD (get_plcs, add_plc, remove_plc, update_plc, get_plc_variables, add_plc_variable, remove_plc_variable)
+  - `app/main.py` — Métodos API: get_plcs, add_plc, remove_plc, test_plc_connection, update_plc, get_plc_variables, add_plc_variable, remove_plc_variable, get_plc_live_data, reconnect_plc
+  - `app/templates/index.html` — Vista PLCs (solo admin): Paneles A/B/C (lista, variables, vista en vivo), modales agregar PLC/variable, polling 1 s con actualización en vivo de valores Bool/Int/Real
+- **Próximo paso**: Probar con PLC físico nuevo cuando esté disponible; Celda 3105 sigue en Node-RED sin cambios
+
+---
+
 ## ENTRADA #001 — Pipeline ESP32 → MQTT → n8n → InfluxDB
 - **Fecha**: 2026-03-28
 - **Estado**: ✅ Completado — HITO FASE 1
