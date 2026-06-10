@@ -2,6 +2,17 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #089 — Fix SCT umbral 0.15A + borrar dashboards corregido
+- **Fecha**: 2026-06-10
+- **Acción**:
+  - `firmware/esp32-s3/include/config.h`: `SCT_MIN_CURRENT` 0.30f → 0.15f para detectar foco 40W (0.18A). ESP32 no conectado al momento del cambio — pendiente flash.
+  - `app/templates/index.html`: Bug en botón eliminar dashboard — `JSON.stringify(d.nombre)` dentro de atributo `onclick` con comillas dobles rompía el HTML; el parser truncaba el handler y la función nunca se ejecutaba. Fix: data attributes (`data-dash-id`, `data-dash-nombre`) + `onclick="confirmDeleteDash(+this.dataset.dashId, this.dataset.dashNombre)"`. También: `_currentDashId = null` al borrar + cast `+dashId` explícito.
+- **Estado**: ✅ Completado (flash ESP32 pendiente)
+- **Archivos modificados**: `firmware/esp32-s3/include/config.h`, `app/templates/index.html`
+- **Próximo paso**: Conectar ESP32, `pio run -e debug --target upload`, verificar ~0.18A con foco
+
+---
+
 ## ENTRADA #088 — Módulo 4 — Análisis Estadístico y Predicciones
 - **Fecha**: 2026-06-09
 - **Implementado**:

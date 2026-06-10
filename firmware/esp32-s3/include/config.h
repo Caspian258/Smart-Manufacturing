@@ -32,8 +32,8 @@
 #define SCT_RATIO        30.0f  // 30A por cada 1V de salida
 #define SCT_CALIBRATION     1.333f  // Empírico: torno ROMI — pinza=6.80A ESP32=5.10A → factor=1.333
 #define SCT_SAMPLE_MS       500
-#define SCT_MIN_CURRENT     0.30f   // Umbral ruido ADC: cargas reales > 0.30A (~66W a 220V)
-                                    // Foco 40W = 0.18A → no medible (por debajo del umbral)
+#define SCT_MIN_CURRENT     0.15f   // Umbral ruido ADC: cargas reales > 0.15A (~33W a 220V)
+                                    // Foco 40W = 0.18A → medible ✅
                                     // Torno industrial = ~7A → medible ✅
 
 // Red industrial

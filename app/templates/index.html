@@ -3425,7 +3425,9 @@ async function loadDashboards() {
             <i class="ti ti-file-type-pdf"></i>
           </button>
           <button class="btn-ghost" style="font-size:12px"
-            onclick="confirmDeleteDash(${d.id}, ${JSON.stringify(d.nombre)})" title="Eliminar">
+            data-dash-id="${d.id}"
+            data-dash-nombre="${(d.nombre||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"
+            onclick="confirmDeleteDash(+this.dataset.dashId, this.dataset.dashNombre)" title="Eliminar">
             <i class="ti ti-trash"></i>
           </button>
         </div>
@@ -3733,9 +3735,12 @@ async function submitCreateDash() {
 async function confirmDeleteDash(dashId, nombre) {
   if (!confirm(`¿Eliminar dashboard "${nombre}" y todos sus widgets?`)) return;
   try {
-    const r = await window.pywebview.api.delete_dashboard(dashId);
-    if (r.ok) { showToast('Dashboard eliminado', 'success'); loadDashboards(); }
-    else showToast('Error: ' + r.error, 'warning');
+    const r = await window.pywebview.api.delete_dashboard(+dashId);
+    if (r.ok) {
+      _currentDashId = null;
+      showToast('Dashboard eliminado', 'success');
+      loadDashboards();
+    } else showToast('Error: ' + r.error, 'warning');
   } catch(e) { showToast('Error', 'warning'); }
 }
 
