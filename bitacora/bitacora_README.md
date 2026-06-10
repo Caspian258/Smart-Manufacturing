@@ -2,6 +2,18 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #085 — Widget datasource selector — variables disponibles en dropdown
+- **Fecha**: 2026-06-09 13:00
+- **Acción**: Reemplazó los campos de texto libre del Paso 2 del modal de widget (measurement, field, machine_id, plc_id, var_id) por un selector agrupado dinámico que muestra todas las fuentes disponibles del sistema.
+- **Estado**: ✅ Completado
+- **Archivos modificados**:
+  - `app/db.py` — `get_plcs_with_variables()`: retorna PLCs activos con sus variables anidadas
+  - `app/main.py` — `get_available_datasources()`: retorna grupos Planta 1 CIMA, Celda 3105, y PLCs registrados con variables; importa `get_plcs_with_variables`
+  - `app/templates/index.html` — Paso 2 HTML: `wm-variable-select` (optgroup dinámico), `wm-var-summary` (badge info), paneles condicionales `wm-influx-opts` / `wm-plc-opts` / `wm-static-opts`; JS: `loadDatasources`, `onVariableSelect`, actualización de `openWidgetModal`, `buildWmPreview`, `submitWidget` para usar `_wmSelectedVar`
+- **Próximo paso**: Probar selección en entorno real con InfluxDB y PLC conectados
+
+---
+
 ## ENTRADA #084 — Dashboard Builder — widgets drag&drop con Chart.js y gridstack
 - **Fecha**: 2026-06-09 12:00
 - **Acción**: Implementación completa del módulo Dashboard Builder (Módulo 2). Permite crear dashboards personalizados con widgets drag&drop, redimensionables, conectados a InfluxDB, PLC o datos estáticos.

@@ -155,6 +155,25 @@ def get_plc_variables(plc_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_plcs_with_variables() -> list[dict]:
+    """Retorna PLCs activos con sus variables anidadas."""
+    conn = get_db()
+    plcs = conn.execute(
+        "SELECT * FROM plcs WHERE activo = 1 ORDER BY id"
+    ).fetchall()
+    result = []
+    for plc in plcs:
+        p = dict(plc)
+        vars_ = conn.execute(
+            "SELECT * FROM plc_variables WHERE plc_id = ? AND activo = 1 ORDER BY id",
+            (p['id'],),
+        ).fetchall()
+        p['variables'] = [dict(v) for v in vars_]
+        result.append(p)
+    conn.close()
+    return result
+
+
 def add_plc_variable(plc_id: int, nombre: str, direccion: str,
                      tipo: str, descripcion: str) -> int:
     conn = get_db()

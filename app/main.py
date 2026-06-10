@@ -61,6 +61,7 @@ from db import (
     get_plc_variables as _db_get_plc_variables,
     add_plc_variable as _db_add_plc_variable,
     remove_plc_variable as _db_remove_plc_variable,
+    get_plcs_with_variables as _db_get_plcs_with_variables,
     init_dashboard_tables,
     seed_example_dashboards,
     get_dashboards as _db_get_dashboards,
@@ -923,6 +924,77 @@ class Api:
             return {"ok": True}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
+
+    def get_available_datasources(self) -> list:
+        """Retorna fuentes de datos disponibles organizadas por grupo."""
+        if not self._session:
+            return []
+        sources = []
+
+        sources.append({
+            'grupo': 'Planta 1 — CIMA (ESP32)',
+            'variables': [
+                {'label': 'Potencia (W)',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'sensor-data', 'field': 'power_w',
+                            'machine_id': 'torno'}},
+                {'label': 'Corriente (A)',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'sensor-data', 'field': 'irms_a',
+                            'machine_id': 'torno'}},
+                {'label': 'Energía acumulada (kWh)',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'sensor-data', 'field': 'energy_kwh',
+                            'machine_id': 'torno'}},
+            ],
+        })
+
+        sources.append({
+            'grupo': 'Celda 3105 — PLC',
+            'variables': [
+                {'label': 'Piezas aprobadas',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'celda3105_estado',
+                            'field': 'piezas_aprobadas'}},
+                {'label': 'Piezas rechazadas',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'celda3105_estado',
+                            'field': 'piezas_rechazadas'}},
+                {'label': 'Duración ciclo (s)',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'celda3105_ciclos',
+                            'field': 'duration_s'}},
+                {'label': 'OEE (%)',
+                 'fuente': 'influxdb',
+                 'config': {'measurement': 'celda3105_estado',
+                            'field': 'oee'}},
+            ],
+        })
+
+        try:
+            plcs = _db_get_plcs_with_variables()
+            for plc in plcs:
+                if plc.get('variables'):
+                    sources.append({
+                        'grupo': f"PLC — {plc['nombre']} ({plc['ip']})",
+                        'variables': [
+                            {
+                                'label': v['nombre'],
+                                'fuente': 'plc',
+                                'config': {
+                                    'plc_id':     plc['id'],
+                                    'variable_id': v['id'],
+                                    'direccion':   v['direccion'],
+                                    'tipo':        v['tipo'],
+                                },
+                            }
+                            for v in plc['variables']
+                        ],
+                    })
+        except Exception as exc:
+            log.warning("get_available_datasources PLCs: %s", exc)
+
+        return sources
 
     # ── Cleanup ───────────────────────────────────────────────────────────
 

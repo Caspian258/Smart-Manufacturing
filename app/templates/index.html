@@ -1618,69 +1618,60 @@
             </div>
           </div>
 
-          <!-- Paso 2: Fuente -->
+          <!-- Paso 2: Variable -->
           <div class="wm-step" id="wm-step-2">
-            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Fuente de datos</p>
-            <label class="login-label">Fuente</label>
-            <select class="login-input" id="wm-fuente" onchange="onFuenteChange()">
-              <option value="influxdb">InfluxDB (métricas de sensores)</option>
-              <option value="plc">PLC directo (python-snap7)</option>
-              <option value="static">Estático (datos manuales)</option>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Variable de datos</p>
+
+            <label class="login-label">Variable disponible</label>
+            <select class="login-input" id="wm-variable-select" onchange="onVariableSelect()">
+              <option value="">— Cargando fuentes... —</option>
             </select>
 
-            <!-- InfluxDB config -->
-            <div id="wm-cfg-influx">
-              <label class="login-label">Measurement</label>
-              <input class="login-input" id="wm-measurement" value="sensor-data"/>
-              <label class="login-label">Field</label>
-              <input class="login-input" id="wm-field" value="power_w"/>
-              <label class="login-label">Machine ID (opcional)</label>
-              <input class="login-input" id="wm-machine" placeholder="ej. torno"/>
-              <label class="login-label">Rango de tiempo</label>
-              <select class="login-input" id="wm-range">
-                <option value="-15m">Últimos 15 min</option>
-                <option value="-1h" selected>Última hora</option>
-                <option value="-2h">Últimas 2 h</option>
-                <option value="-8h">Últimas 8 h</option>
-                <option value="-24h">Últimas 24 h</option>
-              </select>
+            <!-- Resumen de selección -->
+            <div id="wm-var-summary" style="display:none;margin:6px 0 10px;padding:7px 10px;background:var(--info-bg);border-radius:var(--radius-md);font-size:11px;color:var(--info-text)">
+              <span id="wm-var-summary-text"></span>
+            </div>
+
+            <!-- Opciones InfluxDB -->
+            <div id="wm-influx-opts" style="display:none">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                  <label class="login-label">Rango de tiempo</label>
+                  <select class="login-input" id="wm-range">
+                    <option value="-15m">Últimos 15 min</option>
+                    <option value="-1h" selected>Última hora</option>
+                    <option value="-6h">Últimas 6 horas</option>
+                    <option value="-24h">Últimas 24 horas</option>
+                    <option value="-7d">Últimos 7 días</option>
+                  </select>
+                </div>
                 <div>
                   <label class="login-label">Agregación</label>
                   <select class="login-input" id="wm-aggregation">
-                    <option value="mean">mean (promedio)</option>
-                    <option value="max">max</option>
-                    <option value="min">min</option>
-                    <option value="sum">sum</option>
-                    <option value="last">last</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="login-label">Ventana</label>
-                  <select class="login-input" id="wm-window">
-                    <option value="1m">1 min</option>
-                    <option value="5m" selected>5 min</option>
-                    <option value="15m">15 min</option>
-                    <option value="1h">1 hora</option>
+                    <option value="mean">Promedio</option>
+                    <option value="max">Máximo</option>
+                    <option value="min">Mínimo</option>
+                    <option value="last">Último valor</option>
+                    <option value="sum">Suma</option>
                   </select>
                 </div>
               </div>
-            </div>
-
-            <!-- PLC config -->
-            <div id="wm-cfg-plc" style="display:none">
-              <label class="login-label">PLC</label>
-              <select class="login-input" id="wm-plc-id" onchange="loadWmPlcVars()">
-                <option value="">— Selecciona PLC —</option>
-              </select>
-              <label class="login-label">Variable</label>
-              <select class="login-input" id="wm-var-id">
-                <option value="">— Selecciona variable —</option>
+              <label class="login-label">Ventana de agregación</label>
+              <select class="login-input" id="wm-window">
+                <option value="1m">1 min</option>
+                <option value="5m" selected>5 min</option>
+                <option value="15m">15 min</option>
+                <option value="1h">1 hora</option>
               </select>
             </div>
 
-            <!-- Estático config -->
-            <div id="wm-cfg-static" style="display:none">
+            <!-- PLC: tiempo real -->
+            <div id="wm-plc-opts" style="display:none;margin:6px 0 10px;padding:7px 10px;background:var(--success-bg);border-radius:var(--radius-md);font-size:11px;color:var(--success-text)">
+              <i class="ti ti-bolt"></i> Valor en tiempo real — lectura directa desde el PLC.
+            </div>
+
+            <!-- Estático -->
+            <div id="wm-static-opts" style="display:none">
               <label class="login-label">Etiquetas (separadas por coma)</label>
               <input class="login-input" id="wm-static-labels" placeholder="ej. Ene,Feb,Mar"/>
               <label class="login-label">Valores (separados por coma)</label>
@@ -3362,14 +3353,16 @@ function showToast(msg, type) {
 }
 
 // ── Dashboard Builder ─────────────────────────────────────────────────────────
-let _dashGrid       = null;
-let _currentDashId  = null;
-let _dashCharts     = {};
-let _wmStep         = 1;
-let _wmTipo         = 'line';
-let _wmColor        = '#00d4aa';
+let _dashGrid        = null;
+let _currentDashId   = null;
+let _dashCharts      = {};
+let _wmStep          = 1;
+let _wmTipo          = 'line';
+let _wmColor         = '#00d4aa';
 let _editingWidgetId = null;
-let _wmPreviewChart = null;
+let _wmPreviewChart  = null;
+let _wmSources       = [];
+let _wmSelectedVar   = null;
 
 function destroyAllDashCharts() {
   Object.values(_dashCharts).forEach(c => { try { c.destroy(); } catch(e) {} });
@@ -3634,22 +3627,23 @@ async function confirmDeleteWidget(widgetId) {
 
 function openWidgetModal(widgetId) {
   _editingWidgetId = widgetId;
-  _wmStep  = 1;
-  _wmTipo  = 'line';
-  _wmColor = '#00d4aa';
-  document.getElementById('wm-titulo').value          = '';
-  document.getElementById('wm-ancho').value           = '6';
-  document.getElementById('wm-alto').value            = '3';
-  document.getElementById('wm-measurement').value     = 'sensor-data';
-  document.getElementById('wm-field').value           = 'power_w';
-  document.getElementById('wm-machine').value         = '';
-  document.getElementById('wm-static-labels').value   = '';
-  document.getElementById('wm-static-values').value   = '';
-  document.getElementById('wm-msg').textContent       = '';
-  document.getElementById('wm-title').textContent     = widgetId ? 'Editar Widget' : 'Agregar Widget';
+  _wmStep        = 1;
+  _wmTipo        = 'line';
+  _wmColor       = '#00d4aa';
+  _wmSelectedVar = null;
+  document.getElementById('wm-titulo').value        = '';
+  document.getElementById('wm-ancho').value         = '6';
+  document.getElementById('wm-alto').value          = '3';
+  document.getElementById('wm-static-labels').value = '';
+  document.getElementById('wm-static-values').value = '';
+  document.getElementById('wm-msg').textContent     = '';
+  document.getElementById('wm-title').textContent   = widgetId ? 'Editar Widget' : 'Agregar Widget';
+  document.getElementById('wm-var-summary').style.display   = 'none';
+  document.getElementById('wm-influx-opts').style.display   = 'none';
+  document.getElementById('wm-plc-opts').style.display      = 'none';
+  document.getElementById('wm-static-opts').style.display   = 'none';
   document.querySelectorAll('.wm-tipo-btn:not([style*="background"])').forEach(b => b.classList.remove('selected'));
-  onFuenteChange();
-  loadWmPlcs();
+  loadDatasources();
   wmGoStep(1);
   document.getElementById('modal-widget').style.display = 'flex';
 }
@@ -3672,33 +3666,82 @@ function selectColor(color, btn) {
   btn.classList.add('selected');
 }
 
-function onFuenteChange() {
-  const f = document.getElementById('wm-fuente')?.value || 'influxdb';
-  document.getElementById('wm-cfg-influx').style.display = f === 'influxdb' ? 'block' : 'none';
-  document.getElementById('wm-cfg-plc').style.display    = f === 'plc'      ? 'block' : 'none';
-  document.getElementById('wm-cfg-static').style.display = f === 'static'   ? 'block' : 'none';
-}
-
-async function loadWmPlcs() {
-  const sel = document.getElementById('wm-plc-id');
+async function loadDatasources() {
+  const sel = document.getElementById('wm-variable-select');
   if (!sel) return;
+  sel.innerHTML = '<option value="">— Cargando fuentes... —</option>';
   try {
-    const plcs = await window.pywebview.api.get_plcs();
-    sel.innerHTML = '<option value="">— Selecciona PLC —</option>' +
-      (plcs || []).map(p => `<option value="${p.id}">${esc(p.nombre)} (${esc(p.ip)})</option>`).join('');
-  } catch(e) {}
+    _wmSources = await window.pywebview.api.get_available_datasources();
+    sel.innerHTML = '<option value="">— Selecciona una variable —</option>';
+
+    // Opción estática siempre disponible
+    const staticOpt = document.createElement('option');
+    staticOpt.value = 'static';
+    staticOpt.textContent = 'Datos manuales / Estáticos';
+    staticOpt.dataset.config = JSON.stringify({label:'Datos manuales',fuente:'static',config:{}});
+    sel.appendChild(staticOpt);
+
+    (_wmSources || []).forEach((grupo, gi) => {
+      const og = document.createElement('optgroup');
+      og.label = grupo.grupo;
+      (grupo.variables || []).forEach((v, vi) => {
+        const opt = document.createElement('option');
+        opt.value = `${gi}-${vi}`;
+        opt.textContent = v.label;
+        opt.dataset.config = JSON.stringify(v);
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+  } catch(e) {
+    sel.innerHTML = '<option value="">Sin conexión — usa datos estáticos</option>';
+    const staticOpt = document.createElement('option');
+    staticOpt.value = 'static';
+    staticOpt.textContent = 'Datos manuales / Estáticos';
+    staticOpt.dataset.config = JSON.stringify({label:'Datos manuales',fuente:'static',config:{}});
+    sel.appendChild(staticOpt);
+  }
 }
 
-async function loadWmPlcVars() {
-  const plcId = document.getElementById('wm-plc-id')?.value;
-  const sel   = document.getElementById('wm-var-id');
-  if (!sel || !plcId) return;
-  sel.innerHTML = '<option value="">Cargando...</option>';
-  try {
-    const vars = await window.pywebview.api.get_plc_variables(parseInt(plcId));
-    sel.innerHTML = '<option value="">— Selecciona variable —</option>' +
-      (vars || []).map(v => `<option value="${v.id}">${esc(v.nombre)} [${v.tipo}]</option>`).join('');
-  } catch(e) { sel.innerHTML = '<option value="">Error al cargar</option>'; }
+function onVariableSelect() {
+  const sel = document.getElementById('wm-variable-select');
+  const val = sel?.value;
+
+  // Reset panels
+  document.getElementById('wm-var-summary').style.display   = 'none';
+  document.getElementById('wm-influx-opts').style.display   = 'none';
+  document.getElementById('wm-plc-opts').style.display      = 'none';
+  document.getElementById('wm-static-opts').style.display   = 'none';
+
+  if (!val) { _wmSelectedVar = null; return; }
+
+  const opt = sel.options[sel.selectedIndex];
+  try { _wmSelectedVar = JSON.parse(opt.dataset.config); }
+  catch(e) { _wmSelectedVar = null; return; }
+
+  // Resumen
+  const sumEl  = document.getElementById('wm-var-summary');
+  const sumTxt = document.getElementById('wm-var-summary-text');
+  if (sumEl && sumTxt) {
+    const cfg = _wmSelectedVar.config || {};
+    let info = '';
+    if (_wmSelectedVar.fuente === 'influxdb') {
+      info = `InfluxDB — ${cfg.measurement} › ${cfg.field}`;
+      if (cfg.machine_id) info += ` · machine: ${cfg.machine_id}`;
+    } else if (_wmSelectedVar.fuente === 'plc') {
+      info = `PLC — ${cfg.direccion} [${cfg.tipo}]`;
+    } else {
+      info = 'Datos estáticos — ingresa etiquetas y valores a mano';
+    }
+    sumTxt.textContent = info;
+    sumEl.style.display = 'block';
+  }
+
+  // Paneles según fuente
+  const f = _wmSelectedVar.fuente;
+  document.getElementById('wm-influx-opts').style.display   = f === 'influxdb' ? 'block' : 'none';
+  document.getElementById('wm-plc-opts').style.display      = f === 'plc'      ? 'block' : 'none';
+  document.getElementById('wm-static-opts').style.display   = f === 'static'   ? 'block' : 'none';
 }
 
 function wmGoStep(n) {
@@ -3718,7 +3761,7 @@ async function buildWmPreview() {
   if (!box) return;
   box.innerHTML = '<span style="color:var(--text-hint)">Generando preview...</span>';
   if (_wmPreviewChart) { try { _wmPreviewChart.destroy(); } catch(e) {} _wmPreviewChart = null; }
-  const fuente = document.getElementById('wm-fuente')?.value || 'static';
+  const fuente = _wmSelectedVar?.fuente || 'static';
   const titulo = document.getElementById('wm-titulo')?.value || 'Widget';
   let labels, values;
   if (fuente === 'static') {
@@ -3785,31 +3828,28 @@ async function submitWidget() {
   const titulo = document.getElementById('wm-titulo')?.value.trim() || _wmTipo;
   const ancho  = parseInt(document.getElementById('wm-ancho')?.value  || 6);
   const alto   = parseInt(document.getElementById('wm-alto')?.value   || 3);
-  const fuente = document.getElementById('wm-fuente')?.value || 'static';
   const msg    = document.getElementById('wm-msg');
 
-  let fCfg = {};
+  if (!_wmSelectedVar) {
+    if (msg) { msg.style.color = 'var(--danger-text)'; msg.textContent = 'Selecciona una variable en el Paso 2'; }
+    wmGoStep(2);
+    return;
+  }
+
+  const fuente = _wmSelectedVar.fuente;
+  let fCfg = { ...(_wmSelectedVar.config || {}) };
+
   if (fuente === 'influxdb') {
-    fCfg = {
-      measurement: document.getElementById('wm-measurement')?.value  || 'sensor-data',
-      field:       document.getElementById('wm-field')?.value        || 'power_w',
-      range:       document.getElementById('wm-range')?.value        || '-1h',
-      aggregation: document.getElementById('wm-aggregation')?.value  || 'mean',
-      window:      document.getElementById('wm-window')?.value       || '5m',
-    };
-    const mid = document.getElementById('wm-machine')?.value.trim();
-    if (mid) fCfg.machine_id = mid;
-  } else if (fuente === 'plc') {
-    fCfg = {
-      plc_id:      parseInt(document.getElementById('wm-plc-id')?.value  || 0),
-      variable_id: parseInt(document.getElementById('wm-var-id')?.value  || 0),
-    };
-  } else {
+    fCfg.range       = document.getElementById('wm-range')?.value       || '-1h';
+    fCfg.aggregation = document.getElementById('wm-aggregation')?.value || 'mean';
+    fCfg.window      = document.getElementById('wm-window')?.value      || '5m';
+  } else if (fuente === 'static') {
     fCfg = {
       labels: (document.getElementById('wm-static-labels')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
       values: (document.getElementById('wm-static-values')?.value || '').split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)),
     };
   }
+  // fuente === 'plc': fCfg ya tiene plc_id, variable_id, direccion, tipo
 
   const fStr = JSON.stringify(fCfg);
   const cStr = JSON.stringify({ color: _wmColor });
