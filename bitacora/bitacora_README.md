@@ -2,52 +2,71 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
-## ENTRADA #086 — Exportar Dashboard a PDF — reportlab + html2canvas
-- **Fecha**: 2026-06-09 14:00
-- **Acción**: Módulo 3 — Exportación de dashboards a PDF en memoria (BytesIO). Widgets se capturan desde canvas Chart.js o con html2canvas para KPI/tabla. Layout 2 columnas para widgets ≤6 cols, 1 columna para anchos. PDF con header UNIX&Co., separador verde, footer con fecha.
-- **Estado**: ✅ Completado
-- **Archivos modificados**:
-  - `app/db.py` — `get_dashboard_by_id()`: metadatos ligeros del dashboard sin widgets
-  - `app/main.py` — `export_dashboard_pdf(dashboard_id, widgets_images)`: genera PDF en BytesIO con reportlab; retorna base64; soporta placeholder gris si falta imagen
-  - `app/templates/index.html` — botón PDF en toolbar editor y en tarjetas de lista; `data-widget-id`/`data-tipo` en widget-card; `exportDashboardPdf()` captura ordenada por posición gridstack; `exportDashFromList()` abre + espera render + exporta; `loadHtml2Canvas()` lazy-load CDN; `downloadBase64File()` descarga Blob
-- **Próximo paso**: Probar con dashboards reales; verificar compatibilidad html2canvas en WebKit2GTK
+## ENTRADA #087 — Login 3 factores + Autodestrucción
+- **Fecha**: 2026-06-08
+- **Implementado**:
+  - Flujo secuencial: Usuario+PIN → confirmación huella dactilar
+  - AS608 habilitado: `FINGERPRINT_ENABLED=True`, puerto corregido `ttyAMA10 → ttyAMA0`
+  - `authenticate_by_fingerprint()` — busca en librería del sensor
+  - Thread safety con `_fp_lock` (`threading.Lock`, timeout=1s)
+  - Animación pulso concéntrico verde en pantalla de login
+  - Secuencia autodestrucción: 3 intentos fallidos → pantalla roja → cuenta 3→2→1→0 → `close_app()`
+- **Estado**: ✅ Funcional y probado
+
+---
+
+## ENTRADA #086 — Módulo Export PDF Dashboards
+- **Fecha**: 2026-06-09
+- **Implementado**:
+  - `export_dashboard_pdf()` en `main.py` — reportlab en memoria (BytesIO, sin archivos temporales)
+  - Layout dinámico: 2 columnas si widgets ≤ 6 cols, 1 columna si > 6 cols
+  - Header: nombre del dashboard, descripción, fecha, usuario
+  - Footer: marca UNIX&Co. + fecha
+  - Captura Chart.js via `canvas.toDataURL()`
+  - Captura KPI/tabla via html2canvas (lazy-load desde CDN)
+  - Botón PDF en toolbar del editor y en tarjetas de lista
+  - Placeholder gris si falla captura de un widget
+  - `get_dashboard_by_id()` en `db.py` — metadatos ligeros sin widgets
+- **Estado**: ✅ Funcional — probado y descarga correctamente
 
 ---
 
 ## ENTRADA #085 — Widget datasource selector — variables disponibles en dropdown
-- **Fecha**: 2026-06-09 13:00
+- **Fecha**: 2026-06-09
 - **Acción**: Reemplazó los campos de texto libre del Paso 2 del modal de widget (measurement, field, machine_id, plc_id, var_id) por un selector agrupado dinámico que muestra todas las fuentes disponibles del sistema.
+- **Implementado**:
+  - `get_plcs_with_variables()` en `db.py` — PLCs activos con variables anidadas
+  - `get_available_datasources()` en `main.py` — grupos Planta 1 CIMA, Celda 3105, PLCs registrados
+  - `wm-variable-select` con `<optgroup>` dinámicos, badge de resumen, paneles condicionales influx/plc/static
 - **Estado**: ✅ Completado
-- **Archivos modificados**:
-  - `app/db.py` — `get_plcs_with_variables()`: retorna PLCs activos con sus variables anidadas
-  - `app/main.py` — `get_available_datasources()`: retorna grupos Planta 1 CIMA, Celda 3105, y PLCs registrados con variables; importa `get_plcs_with_variables`
-  - `app/templates/index.html` — Paso 2 HTML: `wm-variable-select` (optgroup dinámico), `wm-var-summary` (badge info), paneles condicionales `wm-influx-opts` / `wm-plc-opts` / `wm-static-opts`; JS: `loadDatasources`, `onVariableSelect`, actualización de `openWidgetModal`, `buildWmPreview`, `submitWidget` para usar `_wmSelectedVar`
-- **Próximo paso**: Probar selección en entorno real con InfluxDB y PLC conectados
 
 ---
 
-## ENTRADA #084 — Dashboard Builder — widgets drag&drop con Chart.js y gridstack
-- **Fecha**: 2026-06-09 12:00
-- **Acción**: Implementación completa del módulo Dashboard Builder (Módulo 2). Permite crear dashboards personalizados con widgets drag&drop, redimensionables, conectados a InfluxDB, PLC o datos estáticos.
-- **Estado**: ✅ Completado
-- **Archivos modificados**:
-  - `app/db.py` — Tablas `dashboards` y `dashboard_widgets` + CRUD completo + `seed_example_dashboards()` + `_query_widget_influx()` — ya implementado en sesión anterior
-  - `app/main.py` — Métodos API: get_dashboards, create_dashboard, update_dashboard, delete_dashboard, get_dashboard, add_widget, update_widget, delete_widget, get_widget_data (fuentes: influxdb/plc/static), update_widget_positions — ya implementado en sesión anterior
-  - `app/templates/index.html` — JS Dashboard Builder completo: loadDashboards, openDashEditor, _addWidgetToGrid, renderWidgetData, _renderWidgetInEl, refreshDashWidgets (30s), exitDashEditor, saveDashName, CRUD modales, openWidgetModal (3 pasos: tipo → fuente → preview), selectTipo/selectColor, wmNext/wmPrev/wmGoStep, submitWidget, confirmDeleteDash/Widget. Tipos: line, area, bar, pie (Chart.js), kpi (HTML), table (HTML). Gridstack 10 con 12 columnas y cellHeight 80px.
-- **Próximo paso**: Probar con datos reales de InfluxDB y PLC; extender con exportación PDF de dashboards
+## ENTRADA #084 — Módulo Dashboard Builder
+- **Fecha**: 2026-06-09
+- **Implementado**:
+  - Tablas SQLite: `dashboards`, `dashboard_widgets`
+  - Métodos API: get_dashboards, create_dashboard, update_dashboard, delete_dashboard, get_dashboard, add_widget, update_widget, delete_widget, get_widget_data, update_widget_positions
+  - Tipos de widget: line, area, bar, pie, kpi, table
+  - Fuentes de datos: InfluxDB, PLC (via PLCManager), estático
+  - gridstack.js para layout drag & drop (12 columnas, cellHeight 80px)
+  - `get_available_datasources()` — selector de variables con grupos: Planta 1 CIMA, Celda 3105, PLCs registrados
+  - 2 dashboards de ejemplo al inicializar (`seed_example_dashboards()`)
+  - Auto-refresh cada 30s
+- **Estado**: ✅ Funcional — probado sin PLC/ESP32 conectados
 
 ---
 
-## ENTRADA #083 — Módulo Multi-PLC via python-snap7
-- **Fecha**: 2026-06-09 00:00
-- **Acción**: Implementación completa del módulo de gestión de PLCs S7 adicionales, conexión directa via python-snap7 desde la app PyWebView (independiente del Node-RED de Celda 3105).
-- **Estado**: ✅ Completado
-- **Archivos modificados**:
-  - `app/plc_manager.py` — Clase PLCManager: connect/disconnect/test_connection/read_variable/read_all/start_polling/stop_polling/get_cached_values/get_status + parser de direcciones S7 (DBX, DBW, DBD, M, MW, MD, I, IW, Q, QW)
-  - `app/db.py` — Tablas `plcs` y `plc_variables` + funciones CRUD (get_plcs, add_plc, remove_plc, update_plc, get_plc_variables, add_plc_variable, remove_plc_variable)
-  - `app/main.py` — Métodos API: get_plcs, add_plc, remove_plc, test_plc_connection, update_plc, get_plc_variables, add_plc_variable, remove_plc_variable, get_plc_live_data, reconnect_plc
-  - `app/templates/index.html` — Vista PLCs (solo admin): Paneles A/B/C (lista, variables, vista en vivo), modales agregar PLC/variable, polling 1 s con actualización en vivo de valores Bool/Int/Real
-- **Próximo paso**: Probar con PLC físico nuevo cuando esté disponible; Celda 3105 sigue en Node-RED sin cambios
+## ENTRADA #083 — Módulo Multi-PLC (python-snap7)
+- **Fecha**: 2026-06-09
+- **Implementado**:
+  - Tablas SQLite: `plcs`, `plc_variables`
+  - `app/plc_manager.py` — clase `PLCManager` con connect, disconnect, test_connection, read_variable, read_all, start_polling, get_cached_values, get_status
+  - Parser de direcciones S7: DBX/DBW/DBD, M/MW/MD, I/IW, Q/QW
+  - 10 métodos API en `main.py`: get_plcs, add_plc, remove_plc, test_plc_connection, update_plc, get_plc_variables, add_plc_variable, remove_plc_variable, get_plc_live_data, reconnect_plc
+  - Vista "PLCs" en `index.html` (solo admin): lista de PLCs, panel de variables, vista en vivo, modales agregar/editar
+  - Nota: PLC Celda 3105 (192.168.1.50) sigue en Node-RED — los PLCs nuevos son adicionales via python-snap7
+- **Estado**: ✅ Implementado — pendiente prueba con PLC físico
 
 ---
 
