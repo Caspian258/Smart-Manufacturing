@@ -69,6 +69,7 @@ from db import (
     update_dashboard as _db_update_dashboard,
     delete_dashboard as _db_delete_dashboard,
     get_dashboard as _db_get_dashboard,
+    get_dashboard_by_id as _db_get_dashboard_by_id,
     add_widget as _db_add_widget,
     update_widget as _db_update_widget,
     delete_widget as _db_delete_widget,
@@ -923,6 +924,157 @@ class Api:
             } for p in positions])
             return {"ok": True}
         except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def export_dashboard_pdf(self, dashboard_id, widgets_images) -> dict:
+        """Genera PDF del dashboard con imágenes de los widgets (base64 PNG)."""
+        if not self._session:
+            return {"ok": False, "error": "not_authenticated"}
+        try:
+            import base64, io
+            from datetime import datetime as _dt
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.units import cm
+            from reportlab.platypus import (
+                SimpleDocTemplate, Paragraph, Spacer,
+                Image as RLImage, Table, TableStyle, HRFlowable,
+            )
+            from reportlab.lib.styles import ParagraphStyle
+
+            dash  = _db_get_dashboard_by_id(int(dashboard_id))
+            nombre      = (dash or {}).get("nombre", "Dashboard")
+            descripcion = (dash or {}).get("descripcion", "")
+            fecha       = _dt.now().strftime("%Y-%m-%d %H:%M")
+            usuario     = self._session.get("username", "sistema")
+            safe_n      = "".join(
+                c for c in nombre if c.isalnum() or c in " _-"
+            ).strip() or "dashboard"
+            filename = f"dashboard_{safe_n}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+            PAGE    = landscape(A4)
+            W, _H   = PAGE
+            LM = RM = 1.5 * cm
+            AVAIL_W = W - LM - RM
+            ACCENT  = colors.HexColor("#0F6E56")
+            HINT    = colors.HexColor("#888888")
+            TEXT    = colors.HexColor("#1a1a1a")
+
+            s_title = ParagraphStyle("dt", fontSize=18, fontName="Helvetica-Bold",
+                                      textColor=TEXT, spaceAfter=4, leading=22)
+            s_sub   = ParagraphStyle("ds", fontSize=10, fontName="Helvetica",
+                                      textColor=HINT, spaceAfter=2)
+            s_meta  = ParagraphStyle("dm", fontSize=8,  fontName="Helvetica",
+                                      textColor=HINT, spaceAfter=6)
+            s_wt    = ParagraphStyle("wt", fontSize=9,  fontName="Helvetica-Bold",
+                                      textColor=TEXT, spaceAfter=3)
+            s_foot  = ParagraphStyle("ft", fontSize=7,  fontName="Helvetica",
+                                      textColor=HINT, alignment=1)
+
+            def _decode_img(b64_str, max_w, max_h):
+                if not b64_str:
+                    return None
+                try:
+                    bio = io.BytesIO(base64.b64decode(b64_str))
+                    img = RLImage(bio)
+                    ratio = min(max_w / img.drawWidth, max_h / img.drawHeight)
+                    img.drawWidth  *= ratio
+                    img.drawHeight *= ratio
+                    return img
+                except Exception:
+                    return None
+
+            def _gray_box(w_pt, h_pt):
+                t = Table([["Sin imagen"]], colWidths=[w_pt], rowHeights=[h_pt])
+                t.setStyle(TableStyle([
+                    ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#F4F4F2")),
+                    ("TEXTCOLOR",  (0,0), (-1,-1), HINT),
+                    ("ALIGN",      (0,0), (-1,-1), "CENTER"),
+                    ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+                    ("FONTSIZE",   (0,0), (-1,-1), 8),
+                    ("BOX",        (0,0), (-1,-1), 0.5, colors.HexColor("#CCCCCC")),
+                ]))
+                return t
+
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=PAGE,
+                                    leftMargin=LM, rightMargin=RM,
+                                    topMargin=1.5*cm, bottomMargin=1.5*cm)
+            story = []
+
+            # ── Encabezado ──────────────────────────────────────────────────
+            story.append(Paragraph(nombre, s_title))
+            if descripcion:
+                story.append(Paragraph(descripcion, s_sub))
+            story.append(Paragraph(
+                f"Exportado: {fecha}  ·  Usuario: {usuario}", s_meta))
+            story.append(HRFlowable(width="100%", thickness=2,
+                                    color=ACCENT, spaceAfter=12))
+
+            # ── Widgets ──────────────────────────────────────────────────────
+            wlist = list(widgets_images or [])
+            i = 0
+            while i < len(wlist):
+                w1   = wlist[i]
+                a1   = int(w1.get("ancho", 4))
+                pair = (a1 <= 6 and (i + 1) < len(wlist)
+                        and int(wlist[i+1].get("ancho", 4)) <= 6)
+
+                if pair:
+                    w2    = wlist[i + 1]
+                    col_w = (AVAIL_W - 0.5 * cm) / 2
+                    img_h = 5.5 * cm
+
+                    t1 = Paragraph(w1.get("titulo", ""), s_wt)
+                    i1 = _decode_img(w1.get("image_b64", ""), col_w, img_h)
+                    if i1 is None:
+                        i1 = _gray_box(col_w, img_h)
+
+                    t2 = Paragraph(w2.get("titulo", ""), s_wt)
+                    i2 = _decode_img(w2.get("image_b64", ""), col_w, img_h)
+                    if i2 is None:
+                        i2 = _gray_box(col_w, img_h)
+
+                    tbl = Table(
+                        [[t1, t2], [i1, i2]],
+                        colWidths=[col_w, col_w],
+                        style=[
+                            ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                            ("LEFTPADDING",   (0,0), (-1,-1), 0),
+                            ("RIGHTPADDING",  (0,0), (0,-1),  8),
+                            ("RIGHTPADDING",  (1,0), (1,-1),  0),
+                            ("TOPPADDING",    (0,0), (-1,-1), 0),
+                            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+                        ],
+                    )
+                    story.append(tbl)
+                    i += 2
+                else:
+                    full_h = 7.5 * cm
+                    story.append(Paragraph(w1.get("titulo", ""), s_wt))
+                    story.append(Spacer(1, 3))
+                    img = _decode_img(w1.get("image_b64", ""), AVAIL_W, full_h)
+                    story.append(img if img is not None else _gray_box(AVAIL_W, full_h))
+                    story.append(Spacer(1, 12))
+                    i += 1
+
+            # ── Footer ───────────────────────────────────────────────────────
+            story.append(Spacer(1, 6))
+            story.append(HRFlowable(width="100%", thickness=0.5,
+                                    color=colors.HexColor("#DDDDDD"), spaceAfter=4))
+            story.append(Paragraph(
+                f"Generado por UNIX&amp;Co. Smart Manufacturing  ·  {fecha}",
+                s_foot,
+            ))
+
+            doc.build(story)
+            return {
+                "ok":       True,
+                "pdf_b64":  base64.b64encode(buffer.getvalue()).decode(),
+                "filename": filename,
+            }
+        except Exception as exc:
+            log.error("export_dashboard_pdf: %s", exc)
             return {"ok": False, "error": str(exc)}
 
     def get_available_datasources(self) -> list:

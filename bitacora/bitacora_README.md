@@ -2,6 +2,18 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #086 — Exportar Dashboard a PDF — reportlab + html2canvas
+- **Fecha**: 2026-06-09 14:00
+- **Acción**: Módulo 3 — Exportación de dashboards a PDF en memoria (BytesIO). Widgets se capturan desde canvas Chart.js o con html2canvas para KPI/tabla. Layout 2 columnas para widgets ≤6 cols, 1 columna para anchos. PDF con header UNIX&Co., separador verde, footer con fecha.
+- **Estado**: ✅ Completado
+- **Archivos modificados**:
+  - `app/db.py` — `get_dashboard_by_id()`: metadatos ligeros del dashboard sin widgets
+  - `app/main.py` — `export_dashboard_pdf(dashboard_id, widgets_images)`: genera PDF en BytesIO con reportlab; retorna base64; soporta placeholder gris si falta imagen
+  - `app/templates/index.html` — botón PDF en toolbar editor y en tarjetas de lista; `data-widget-id`/`data-tipo` en widget-card; `exportDashboardPdf()` captura ordenada por posición gridstack; `exportDashFromList()` abre + espera render + exporta; `loadHtml2Canvas()` lazy-load CDN; `downloadBase64File()` descarga Blob
+- **Próximo paso**: Probar con dashboards reales; verificar compatibilidad html2canvas en WebKit2GTK
+
+---
+
 ## ENTRADA #085 — Widget datasource selector — variables disponibles en dropdown
 - **Fecha**: 2026-06-09 13:00
 - **Acción**: Reemplazó los campos de texto libre del Paso 2 del modal de widget (measurement, field, machine_id, plc_id, var_id) por un selector agrupado dinámico que muestra todas las fuentes disponibles del sistema.

@@ -297,6 +297,16 @@ def get_dashboard(dashboard_id: int) -> dict | None:
     return result
 
 
+def get_dashboard_by_id(dashboard_id: int) -> dict | None:
+    """Retorna solo los metadatos del dashboard (sin widgets)."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM dashboards WHERE id = ?", (dashboard_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def add_widget(dashboard_id: int, tipo: str, titulo: str, fuente: str,
                fuente_config: str, chart_config: str,
                pos_x: int, pos_y: int, ancho: int, alto: int) -> int:

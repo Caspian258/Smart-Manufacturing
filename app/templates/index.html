@@ -1545,6 +1545,9 @@
               <button class="btn-ghost" onclick="openWidgetModal(null)">
                 <i class="ti ti-plus"></i> Widget
               </button>
+              <button class="btn-ghost" onclick="exportDashboardPdf()" id="btn-dash-pdf">
+                <i class="ti ti-file-type-pdf"></i> PDF
+              </button>
               <button class="btn-ghost" onclick="saveDashName()">
                 <i class="ti ti-device-floppy"></i> Guardar
               </button>
@@ -3389,6 +3392,9 @@ async function loadDashboards() {
           <button class="btn-primary" style="flex:1;font-size:12px" onclick="openDashEditor(${d.id})">
             <i class="ti ti-layout-dashboard"></i> Abrir
           </button>
+          <button class="btn-ghost" style="font-size:12px" onclick="exportDashFromList(${d.id})" title="Exportar PDF">
+            <i class="ti ti-file-type-pdf"></i>
+          </button>
           <button class="btn-ghost" style="font-size:12px"
             onclick="confirmDeleteDash(${d.id}, ${JSON.stringify(d.nombre)})" title="Eliminar">
             <i class="ti ti-trash"></i>
@@ -3435,7 +3441,7 @@ async function openDashEditor(dashId) {
 
 function _addWidgetToGrid(w) {
   const bodyId = 'wb-' + w.id;
-  const html = `<div class="widget-card">
+  const html = `<div class="widget-card" data-widget-id="${w.id}" data-tipo="${w.tipo}">
     <div class="widget-header">
       <span class="widget-title">${esc(w.titulo || w.tipo)}</span>
       <div class="widget-actions">
@@ -3815,6 +3821,93 @@ async function buildWmPreview() {
       },
     },
   });
+}
+
+// ── Export Dashboard PDF ──────────────────────────────────────────────────────
+
+async function exportDashboardPdf() {
+  if (!_currentDashId || !_dashGrid) {
+    showToast('Abre un dashboard primero', 'warning');
+    return;
+  }
+  const btn = document.getElementById('btn-dash-pdf');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+  showToast('Capturando widgets...', 'info');
+
+  try {
+    const widgets = [];
+    // Ordenar por posición visual (y, luego x)
+    const nodes = [...(_dashGrid.engine.nodes || [])].sort(
+      (a, b) => (a.y - b.y) || (a.x - b.x)
+    );
+
+    for (const node of nodes) {
+      const bodyEl = document.getElementById('wb-' + node.id);
+      const cardEl = bodyEl?.closest('.widget-card');
+      if (!bodyEl) continue;
+
+      const titulo = cardEl?.querySelector('.widget-title')?.textContent?.trim() || '';
+      const tipo   = cardEl?.dataset?.tipo || 'line';
+      const ancho  = node.w || 4;
+      let image_b64 = '';
+
+      const canvas = bodyEl.querySelector('canvas');
+      if (canvas) {
+        image_b64 = canvas.toDataURL('image/png').split(',')[1];
+      } else {
+        try {
+          const h2c = await loadHtml2Canvas();
+          const cap = await h2c(bodyEl, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+          image_b64 = cap.toDataURL('image/png').split(',')[1];
+        } catch(e) {
+          console.warn('html2canvas:', e);
+        }
+      }
+      widgets.push({ titulo, image_b64, tipo, ancho });
+    }
+
+    const r = await window.pywebview.api.export_dashboard_pdf(_currentDashId, widgets);
+    if (r.ok) {
+      downloadBase64File(r.pdf_b64, r.filename, 'application/pdf');
+      showToast('PDF generado', 'success');
+    } else {
+      showToast('Error PDF: ' + (r.error || ''), 'warning');
+    }
+  } catch(e) {
+    showToast('Error al generar PDF', 'warning');
+    console.error('exportDashboardPdf:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-file-type-pdf"></i> PDF'; }
+  }
+}
+
+async function exportDashFromList(dashId) {
+  showToast('Cargando dashboard...', 'info');
+  await openDashEditor(dashId);
+  // Esperar a que los widgets rendericen sus datos asíncronos
+  await new Promise(r => setTimeout(r, 2800));
+  await exportDashboardPdf();
+}
+
+async function loadHtml2Canvas() {
+  if (window.html2canvas) return window.html2canvas;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload  = () => resolve(window.html2canvas);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function downloadBase64File(b64, filename, mimeType) {
+  const bytes = atob(b64);
+  const arr   = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([arr], { type: mimeType }));
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function wmPrev() { if (_wmStep > 1) wmGoStep(_wmStep - 1); }
