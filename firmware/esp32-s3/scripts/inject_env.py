@@ -11,7 +11,7 @@ def find_env():
     return None
 
 VARS = ["WIFI_SSID","WIFI_PASSWORD","WIFI_BSSID","WIFI_CHANNEL","MQTT_BROKER","MQTT_PORT",
-        "MQTT_USER","MQTT_PASSWORD","MACHINE_ID","OTA_PASSWORD"]
+        "MQTT_TLS","MQTT_USER","MQTT_PASSWORD","MACHINE_ID","OTA_PASSWORD"]
 
 env_file = find_env()
 if not env_file:
@@ -27,5 +27,5 @@ for line in env_file.read_text().splitlines():
 for var in VARS:
     val = env.get(var, "")
     if not val: continue
-    if var in ("MQTT_PORT", "WIFI_CHANNEL"): print(f"-D{var}={val}")
+    if var in ("MQTT_PORT", "MQTT_TLS", "WIFI_CHANNEL"): print(f"-D{var}={val}")
     else: print(f'-D{var}=\\"{val.replace(chr(34), chr(92)+chr(34))}\\"')

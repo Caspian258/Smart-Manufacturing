@@ -1645,3 +1645,18 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200  # alternativa
   - Roles permitidos: planta2 y admin.
   - Timers correctamente limpiados en `showView()` al navegar fuera de la vista.
 - **Próximo paso**: Definir flujo de escritura a `celda3105_ciclos` desde Node-RED o el ESP32
+
+## ENTRADA #093 — Fix RFID RC522 + SCT-013 + red Wireless_N_5AD4
+- **Fecha**: 2026-06-10 13:55
+- **Acción**: Arquitectura de red definitiva + diagnóstico RFID clon + fix MQTT_TLS
+- **Estado**: ✅ Completado
+- **Archivos modificados**: firmware/esp32-s3/src/main.cpp, firmware/esp32-s3/.env, firmware/esp32-s3/platformio.ini, firmware/esp32-s3/scripts/inject_env.py
+- **Detalles**:
+  - **Red definitiva**: ESP32 → Wireless_N_5AD4 → MQTT broker 192.168.1.171 (RPi5 wlan0)
+  - **Fix MQTT_TLS**: `-DMQTT_TLS=1` estaba hardcodeado en platformio.ini mientras .env usa puerto 1883 (sin TLS). Movido a inject_env.py con MQTT_TLS=0 en .env.
+  - **RFID clon detectado**: VersionReg=0x82 — chip clon chino (no NXP original 0x91/0x92). SPI OK. Fix: ampliar condición de OK a rango 0x80-0x92; delay(50) post-PCD_Init() para estabilización.
+  - **RFID DBG**: Agregado `[RFID DBG] present=X` en loop() cada 2s para diagnóstico sin tarjeta.
+  - **SCT formato**: Printf combinado `dc/N/vrms/raw/final` en una línea.
+  - **Resultado boot**: `[RFID] VersionReg: 0x82 — OK` ✅, `[RFID DBG] present=0` ✅
+  - **Pendiente**: Verificar con tarjeta RFID acercada (present=1 → UID) y medir SCT con WiFi estable en Tec-IoT.
+- **Próximo paso**: Llevar ESP32 al Tec, conectar a Wireless_N_5AD4, verificar MQTT → InfluxDB y RFID con tarjeta física

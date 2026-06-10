@@ -88,13 +88,13 @@ PowerReading measurePower() {
     delayMicroseconds(200);
   }
   // Paso 3 — RMS media onda × √2: LM358 single supply recorta semiciclo negativo
-  float vrms = (N > 0) ? sqrtf(2.0f * sumSq / N) : 0.0f;
+  float vrms     = (N > 0) ? sqrtf(2.0f * sumSq / N) : 0.0f;
+  float irms_raw = vrms * SCT_RATIO * SCT_CALIBRATION;
+  float irms     = (irms_raw < SCT_MIN_CURRENT) ? 0.0f : irms_raw;
 
-  // Paso 4 — Conversión V → A (SCT-013 30A/1V: salida de voltaje)
-  float irms = vrms * SCT_RATIO * SCT_CALIBRATION;
+  Serial.printf("[SCT] dc=%d N=%d vrms=%.5f raw=%.4f final=%.4f\n",
+      dcOffset, N, vrms, irms_raw, irms);
 
-  // Paso 5 — Umbral de ruido y potencia
-  if (irms < SCT_MIN_CURRENT) irms = 0.0f;
   float power  = irms * GRID_VOLTAGE * POWER_FACTOR;
   float energy = power * (SCT_SAMPLE_MS / 1000.0f) / 3600000.0f;
 
@@ -137,14 +137,16 @@ void testAmperage() {
     float vrms = (count > 0)
       ? sqrtf(2.0f * (float)sumSq / count) / 4096.0f * 3.3f
       : 0.0f;
-    float irms = vrms * SCT_RATIO * SCT_CALIBRATION;
-    if (irms < SCT_MIN_CURRENT) irms = 0.0f;
+    float irms_raw2 = vrms * SCT_RATIO * SCT_CALIBRATION;
+    float irms      = (irms_raw2 < SCT_MIN_CURRENT) ? 0.0f : irms_raw2;
     float power = irms * 220.0f * 0.85f;
+    Serial.printf("  [%2d/10] vrms=%.4fV irms_raw=%.4fA irms=%.3fA\n",
+                  i + 1, vrms, irms_raw2, irms);
     samples[i]  = irms;
     sumA        += irms;
     if (irms < minA) minA = irms;
     if (irms > maxA) maxA = irms;
-    Serial.printf("  [%2d/10] Irms: %.3f A  ->  %.1f W\n", i + 1, irms, power);
+    Serial.printf("  [%2d/10] Irms: %.3f A  ->  %.1f W\n", i + 1, irms, power);  // post-threshold
   }
 
   float avgA = sumA / 10.0f;
@@ -371,19 +373,16 @@ void setup() {
   }
   SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_RFID_SS);
   rfid.PCD_Init();
+  delay(50);  // clones MFRC522 necesitan estabilización post-init
   rfid.PCD_SetAntennaGain(rfid.RxGain_max);
-  Serial.println("[RFID] RC522 inicializado");
 
-  // Diagnóstico RC522: leer VersionReg para confirmar SPI OK
   byte ver = rfid.PCD_ReadRegister(MFRC522::VersionReg);
-  Serial.printf("[RFID] VersionReg: 0x%02X\n", ver);
-  if (ver == 0x91 || ver == 0x92) {
-    Serial.println("[RFID] ✅ RC522 OK");
-  } else if (ver == 0x00 || ver == 0xFF) {
-    Serial.println("[RFID] ❌ SPI no responde — verificar cableado");
-  } else {
-    Serial.printf("[RFID] ⚠️ Valor inesperado: 0x%02X\n", ver);
-  }
+  // 0x91/0x92 = NXP original; 0x80-0x88 = clones chinos (SPI OK, funcionan)
+  bool rfidOk = (ver >= 0x80 && ver <= 0x92 && ver != 0x00 && ver != 0xFF);
+  Serial.printf("[RFID] VersionReg: 0x%02X — %s\n", ver,
+      rfidOk                        ? "OK" :
+      (ver == 0x00 || ver == 0xFF)  ? "ERROR SPI" :
+      "Inesperado");
 
   // WiFi
   wifiBegin();
@@ -473,12 +472,16 @@ void loop() {
 
   uint32_t now = millis();
 
-  if (mqtt.connected()) {
-    if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
-      lastPublish = now;
-      auto p = measurePower();
+  // Medir siempre (diagnóstico): no depender de MQTT para ver [SCT] en serial
+  if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
+    lastPublish = now;
+    auto p = measurePower();
+    if (mqtt.connected()) {
       publishEnergy(p.irmsA, p.powerW, p.energyKwh);
     }
+  }
+
+  if (mqtt.connected()) {
     if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
       lastHeartbeat = now;
       publishHeartbeat();
@@ -487,6 +490,11 @@ void loop() {
 
   // RFID — toggle inicio/fin de ciclo productivo
   {
+    static uint32_t dbg = 0;
+    if (millis() - dbg >= 2000) {
+      dbg = millis();
+      Serial.printf("[RFID DBG] present=%d\n", rfid.PICC_IsNewCardPresent());
+    }
     String uid = readRFID();
     if (!uid.isEmpty()) {
       uint32_t nowMs = millis();
