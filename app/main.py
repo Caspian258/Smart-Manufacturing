@@ -1142,15 +1142,15 @@ class Api:
             'variables': [
                 {'label': 'Potencia (W)',
                  'fuente': 'influxdb',
-                 'config': {'measurement': 'sensor-data', 'field': 'power_w',
+                 'config': {'measurement': 'cima_energy', 'field': 'power_w',
                             'machine_id': 'torno'}},
                 {'label': 'Corriente (A)',
                  'fuente': 'influxdb',
-                 'config': {'measurement': 'sensor-data', 'field': 'irms_a',
+                 'config': {'measurement': 'cima_energy', 'field': 'irms_a',
                             'machine_id': 'torno'}},
                 {'label': 'Energía acumulada (kWh)',
                  'fuente': 'influxdb',
-                 'config': {'measurement': 'sensor-data', 'field': 'energy_kwh',
+                 'config': {'measurement': 'cima_energy', 'field': 'energy_kwh',
                             'machine_id': 'torno'}},
             ],
         })

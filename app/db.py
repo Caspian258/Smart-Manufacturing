@@ -377,17 +377,17 @@ def seed_example_dashboards() -> None:
         "admin",
     )
     add_widget(d1, 'line', 'Potencia Torno — últimas 2h', 'influxdb',
-               _json.dumps({"measurement": "sensor-data", "field": "power_w",
+               _json.dumps({"measurement": "cima_energy", "field": "power_w",
                             "machine_id": "torno", "range": "-2h",
                             "aggregation": "mean", "window": "5m"}),
                _json.dumps({"color": "#00d4aa"}), 0, 0, 8, 4)
     add_widget(d1, 'kpi', 'Corriente Actual (A)', 'influxdb',
-               _json.dumps({"measurement": "sensor-data", "field": "irms_a",
+               _json.dumps({"measurement": "cima_energy", "field": "irms_a",
                             "machine_id": "torno", "range": "-5m",
                             "aggregation": "mean", "window": "1m"}),
                _json.dumps({"color": "#ffa502"}), 8, 0, 4, 2)
     add_widget(d1, 'bar', 'Energía por Hora (kWh)', 'influxdb',
-               _json.dumps({"measurement": "sensor-data", "field": "energy_kwh",
+               _json.dumps({"measurement": "cima_energy", "field": "energy_kwh",
                             "machine_id": "torno", "range": "-8h",
                             "aggregation": "sum", "window": "1h"}),
                _json.dumps({"color": "#5352ed"}), 8, 2, 4, 4)

@@ -2,6 +2,20 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #091 — Dashboard Builder: corrección measurement cima_energy
+- **Fecha**: 2026-06-10
+- **Acción**: El Dashboard Builder referenciaba `"sensor-data"` como measurement, pero el measurement real del ESP32 en InfluxDB es `"cima_energy"`. Corregido en 3 lugares:
+  - `app/main.py` `get_available_datasources()`: 3 variables de Planta 1 actualizadas
+  - `app/db.py` `seed_example_dashboards()`: 3 widgets de ejemplo actualizados
+  - `app/smart_mfg.db` (SQLite): UPDATE en dashboard_widgets — 3 rows migradas
+  - TAREA 2 (machine_id): El filtro ya era correcto (`r.machine_id == "torno"` accede el tag directamente en Flux, no como field)
+  - Query de verificación: 2 puntos en última hora (18:05 → 26.7 W; 18:09 → 21.7 W) ✅
+- **Estado**: ✅ Completado
+- **Archivos modificados**: `app/main.py`, `app/db.py`, `app/smart_mfg.db`
+- **Próximo paso**: Abrir el Dashboard Builder y verificar que los widgets muestran datos del torno
+
+---
+
 ## ENTRADA #090 — Dashboard Builder: auto-refresh por tipo de widget
 - **Fecha**: 2026-06-10
 - **Acción**: Los widgets del Dashboard Builder no se actualizaban en tiempo real (había un único `setInterval` de 30s que re-fetcheaba el dashboard completo en cada ciclo y actualizaba todos los widgets en serie). Reemplazado por sistema de refresh por tipo:
