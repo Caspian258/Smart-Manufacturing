@@ -633,6 +633,11 @@
   .widget-actions button:hover { color: var(--text-primary); }
   .widget-body { flex: 1; padding: 8px; overflow: hidden; position: relative; }
   .widget-body canvas { width: 100% !important; height: 100% !important; }
+  .widget-footer {
+    font-size: 10px; color: var(--text-hint); padding: 2px 8px 3px;
+    border-top: 0.5px solid var(--border); text-align: right;
+    flex-shrink: 0; line-height: 1.4;
+  }
 
   /* KPI widget */
   .widget-kpi {
@@ -2205,7 +2210,7 @@ function showView(name, btn) {
   if (viewTimers.celdaTimers)    { clearInterval(viewTimers.celdaTimers);    delete viewTimers.celdaTimers; }
   if (viewTimers.celdaHistorial) { clearInterval(viewTimers.celdaHistorial); delete viewTimers.celdaHistorial; }
   if (viewTimers.qualityChart)   { clearInterval(viewTimers.qualityChart);   delete viewTimers.qualityChart; }
-  if (viewTimers.dashRefresh)   { clearInterval(viewTimers.dashRefresh);   delete viewTimers.dashRefresh; }
+  stopDashRefresh();
   if (typeof destroyAllDashCharts === 'function' && name !== 'dashboards') destroyAllDashCharts();
   currentView = name;
 
@@ -3395,10 +3400,67 @@ let _editingWidgetId = null;
 let _wmPreviewChart  = null;
 let _wmSources       = [];
 let _wmSelectedVar   = null;
+let _dashTimers      = [];
+let _dashClockTimer  = null;
+let _dashWidgetMeta  = {};
 
 function destroyAllDashCharts() {
   Object.values(_dashCharts).forEach(c => { try { c.destroy(); } catch(e) {} });
   _dashCharts = {};
+}
+
+function getRefreshInterval(tipo) {
+  if (['kpi','line','area'].includes(tipo)) return 5000;
+  if (['bar','pie','table'].includes(tipo)) return 15000;
+  return 60000;
+}
+
+async function refreshWidget(widgetId) {
+  const meta = _dashWidgetMeta[widgetId];
+  if (!meta) return;
+  const bodyEl = document.getElementById('wb-' + widgetId);
+  if (!bodyEl) return;
+  try {
+    const data = await window.pywebview.api.get_widget_data(widgetId);
+    _renderWidgetInEl(meta, data, bodyEl);
+    meta.ts = Date.now();
+  } catch(e) {
+    console.warn('refreshWidget error', widgetId, e);
+  }
+}
+
+function startDashRefresh(widgets) {
+  stopDashRefresh();
+  _dashWidgetMeta = {};
+  widgets.forEach(w => { _dashWidgetMeta[w.id] = w; });
+  const groups = {};
+  widgets.forEach(w => {
+    const ms = getRefreshInterval(w.tipo);
+    if (!groups[ms]) groups[ms] = [];
+    groups[ms].push(w.id);
+  });
+  Object.entries(groups).forEach(([ms, ids]) => {
+    _dashTimers.push(setInterval(() => ids.forEach(id => refreshWidget(id)), +ms));
+  });
+  _dashClockTimer = setInterval(_updateRefreshLabels, 1000);
+}
+
+function stopDashRefresh() {
+  _dashTimers.forEach(t => clearInterval(t));
+  _dashTimers = [];
+  if (_dashClockTimer) { clearInterval(_dashClockTimer); _dashClockTimer = null; }
+  _dashWidgetMeta = {};
+}
+
+function _updateRefreshLabels() {
+  const now = Date.now();
+  Object.entries(_dashWidgetMeta).forEach(([id, meta]) => {
+    const el = document.getElementById('wft-' + id);
+    if (!el) return;
+    if (!meta.ts) { el.textContent = '—'; return; }
+    const secs = Math.round((now - meta.ts) / 1000);
+    el.textContent = secs < 5 ? 'Actualizado ahora' : `Hace ${secs}s`;
+  });
 }
 
 async function loadDashboards() {
@@ -3465,8 +3527,7 @@ async function openDashEditor(dashId) {
       try { await window.pywebview.api.update_widget_positions(positions); } catch(e) {}
     });
 
-    if (viewTimers.dashRefresh) clearInterval(viewTimers.dashRefresh);
-    viewTimers.dashRefresh = setInterval(refreshDashWidgets, 30000);
+    startDashRefresh(dash.widgets || []);
   } catch(e) { console.error('openDashEditor:', e); }
 }
 
@@ -3483,6 +3544,7 @@ function _addWidgetToGrid(w) {
     <div class="widget-body" id="${bodyId}">
       <span style="color:var(--text-hint);font-size:11px">Cargando...</span>
     </div>
+    <div class="widget-footer" id="wft-${w.id}">—</div>
   </div>`;
   _dashGrid.addWidget({ x: w.pos_x||0, y: w.pos_y||0, w: w.ancho||4, h: w.alto||3,
                         id: String(w.id), content: html });
@@ -3495,6 +3557,7 @@ async function renderWidgetData(w) {
   try {
     const data = await window.pywebview.api.get_widget_data(w.id);
     _renderWidgetInEl(w, data, bodyEl);
+    if (_dashWidgetMeta[w.id]) _dashWidgetMeta[w.id].ts = Date.now();
   } catch(e) {
     bodyEl.innerHTML = '<span style="color:var(--text-hint);font-size:11px">Sin datos</span>';
   }
@@ -3667,16 +3730,8 @@ function _renderWidgetInEl(w, data, bodyEl) {
   _dashCharts[w.id] = chart;
 }
 
-async function refreshDashWidgets() {
-  if (!_currentDashId) return;
-  try {
-    const dash = await window.pywebview.api.get_dashboard(_currentDashId);
-    for (const w of (dash?.widgets || [])) await renderWidgetData(w);
-  } catch(e) {}
-}
-
 function exitDashEditor() {
-  if (viewTimers.dashRefresh) { clearInterval(viewTimers.dashRefresh); delete viewTimers.dashRefresh; }
+  stopDashRefresh();
   destroyAllDashCharts();
   if (_dashGrid) {
     try { _dashGrid.destroy(false); } catch(e) {}

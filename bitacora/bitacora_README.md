@@ -2,6 +2,23 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #090 — Dashboard Builder: auto-refresh por tipo de widget
+- **Fecha**: 2026-06-10
+- **Acción**: Los widgets del Dashboard Builder no se actualizaban en tiempo real (había un único `setInterval` de 30s que re-fetcheaba el dashboard completo en cada ciclo y actualizaba todos los widgets en serie). Reemplazado por sistema de refresh por tipo:
+  - `getRefreshInterval(tipo)` → 5s (kpi/line/area), 15s (bar/pie/table), 60s (prediction/statistics/boxplot)
+  - `refreshWidget(widgetId)` → actualización independiente por widget (fallo en uno no rompe los demás)
+  - `startDashRefresh(widgets)` → agrupa por intervalo, crea un timer por grupo
+  - `stopDashRefresh()` → limpia todos los timers; llamado desde `exitDashEditor()` y `showView()`
+  - `_updateRefreshLabels()` → timer 1s que muestra "Actualizado ahora / Hace Xs" en footer de cada widget
+  - CSS `.widget-footer` agregado; elemento `wft-${id}` en cada tarjeta de widget
+  - `renderWidgetData()` registra timestamp inicial al cargar
+  - `refreshDashWidgets()` (función serial obsoleta) eliminada
+- **Estado**: ✅ Completado
+- **Archivos modificados**: `app/templates/index.html`
+- **Próximo paso**: Verificar que los KPI se actualicen cada 5s con el dashboard abierto
+
+---
+
 ## ENTRADA #089 — Fix SCT umbral 0.15A + borrar dashboards corregido
 - **Fecha**: 2026-06-10
 - **Acción**:
