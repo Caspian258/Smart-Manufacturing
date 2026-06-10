@@ -87,7 +87,6 @@ PowerReading measurePower() {
     N++;
     delayMicroseconds(200);
   }
-
   // Paso 3 — RMS media onda × √2: LM358 single supply recorta semiciclo negativo
   float vrms = (N > 0) ? sqrtf(2.0f * sumSq / N) : 0.0f;
 
