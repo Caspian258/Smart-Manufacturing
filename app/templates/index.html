@@ -653,6 +653,23 @@
   }
   .widget-table td { padding: 4px 8px; border-bottom: 0.5px solid var(--border); }
 
+  /* Statistics widget */
+  .stats-widget { display: flex; gap: 10px; height: 100%; overflow: hidden; }
+  .stats-table { flex: 1; overflow-y: auto; }
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 6px;
+              border-bottom: 0.5px solid var(--border); font-size: 11px; }
+  .stat-row span:first-child { color: var(--text-secondary); }
+  .stat-row span:last-child { font-weight: 600; color: var(--accent); }
+  .mini-boxplot-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* Prediction badge */
+  .pred-badges { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; font-size: 10px; }
+  .pred-badge { padding: 2px 8px; border-radius: 12px; background: var(--bg-card);
+                border: 1px solid var(--border); color: var(--text-secondary); }
+  .pred-badge.warn { border-color: #ffa502; color: #ffa502; }
+  .pred-badge.up   { border-color: #2ed573; color: #2ed573; }
+  .pred-badge.down { border-color: #ff4757; color: #ff4757; }
+
   /* Gridstack override */
   .grid-stack { background: transparent; }
   .grid-stack-item-content { border-radius: var(--radius-md); }
@@ -1604,6 +1621,18 @@
               </button>
               <button class="wm-tipo-btn" onclick="selectTipo('table', this)">
                 <i class="ti ti-table"></i>Tabla
+              </button>
+            </div>
+            <p style="font-size:12px;color:var(--text-secondary);margin:12px 0 8px">Análisis</p>
+            <div class="wm-tipo-grid">
+              <button class="wm-tipo-btn" onclick="selectTipo('boxplot', this)">
+                <i class="ti ti-box"></i>Bigotes
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('prediction', this)">
+                <i class="ti ti-trending-up"></i>Predicción
+              </button>
+              <button class="wm-tipo-btn" onclick="selectTipo('statistics', this)">
+                <i class="ti ti-math-function"></i>Estadísticas
               </button>
             </div>
             <label class="login-label">Título del widget</label>
@@ -3480,6 +3509,103 @@ function _renderWidgetInEl(w, data, bodyEl) {
 
   if (_dashCharts[w.id]) { try { _dashCharts[w.id].destroy(); } catch(e) {} delete _dashCharts[w.id]; }
 
+  // ── Tipos analíticos ────────────────────────────────────────────────
+  if (tipo === 'boxplot') {
+    const bp = data.stats;
+    if (!bp) { bodyEl.innerHTML = '<span style="color:var(--text-hint);font-size:11px">Sin datos suficientes (mín. 4 puntos)</span>'; return; }
+    bodyEl.innerHTML = '<div style="display:flex;height:100%;gap:12px;align-items:center">'
+      + '<canvas id="bp-cv-' + w.id + '" style="flex:0 0 120px;height:100%;max-height:220px"></canvas>'
+      + '<div class="stats-table" style="flex:1">'
+      + `<div class="stat-row"><span>Mín</span><span>${bp.min.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Q1</span><span>${bp.q1.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Mediana</span><span style="color:#ffa502">${bp.median.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Q3</span><span>${bp.q3.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Máx</span><span>${bp.max.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Media</span><span>${bp.mean.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Desv. Est.</span><span>${bp.std.toFixed(2)}</span></div>`
+      + `<div class="stat-row"><span>Outliers</span><span style="color:#ff4757">${bp.outliers.length}</span></div>`
+      + `<div class="stat-row"><span>N</span><span>${bp.n}</span></div>`
+      + '</div></div>';
+    const cvEl = document.getElementById('bp-cv-' + w.id);
+    if (cvEl) drawBoxplot(cvEl, bp);
+    return;
+  }
+
+  if (tipo === 'statistics') {
+    const st = data.stats || {};
+    const bp = data.boxplot;
+    const fmt = v => (v !== undefined && v !== null) ? v.toLocaleString('es-MX', {maximumFractionDigits:3}) : '—';
+    bodyEl.innerHTML = '<div class="stats-widget">'
+      + '<div class="stats-table">'
+      + `<div class="stat-row"><span>Media</span><span>${fmt(st.mean)}</span></div>`
+      + `<div class="stat-row"><span>Mediana</span><span>${fmt(st.median)}</span></div>`
+      + `<div class="stat-row"><span>Desv. Est.</span><span>${fmt(st.std)}</span></div>`
+      + `<div class="stat-row"><span>Mín</span><span>${fmt(st.min)}</span></div>`
+      + `<div class="stat-row"><span>Máx</span><span>${fmt(st.max)}</span></div>`
+      + `<div class="stat-row"><span>Rango</span><span>${fmt(st.range)}</span></div>`
+      + `<div class="stat-row"><span>CV (%)</span><span>${fmt(st.cv)}</span></div>`
+      + `<div class="stat-row"><span>N</span><span>${st.n ?? '—'}</span></div>`
+      + '</div>'
+      + (bp ? '<div class="mini-boxplot-wrap"><canvas id="bp-cv-' + w.id + '" width="90" style="height:160px"></canvas></div>' : '')
+      + '</div>';
+    if (bp) { const cvEl = document.getElementById('bp-cv-' + w.id); if (cvEl) drawBoxplot(cvEl, bp); }
+    return;
+  }
+
+  if (tipo === 'prediction') {
+    const values   = data.values || [];
+    const labels   = data.labels || [];
+    const fLabels  = data.forecast_labels || [];
+    const fVals    = data.forecast_values || [];
+    const trend    = data.trend_line || [];
+    const ma       = data.moving_average || [];
+    const anom     = data.anomalies || {};
+    const ri       = data.regression_info || {};
+    if (!values.length) { bodyEl.innerHTML = '<span style="color:var(--text-hint);font-size:11px">Sin datos</span>'; return; }
+    bodyEl.innerHTML = '<div style="display:flex;flex-direction:column;height:100%">'
+      + '<div style="flex:1;min-height:0"><canvas id="pred-cv-' + w.id + '"></canvas></div>'
+      + '<div class="pred-badges" id="pred-bd-' + w.id + '"></div>'
+      + '</div>';
+    const cvEl = document.getElementById('pred-cv-' + w.id);
+    if (!cvEl) return;
+    const allLabels = [...labels, ...fLabels];
+    const realDs    = [...values, ...Array(fLabels.length).fill(null)];
+    const trendDs   = [...trend,  ...Array(fLabels.length).fill(null)];
+    const foreDs    = [...Array(values.length).fill(null), ...fVals];
+    const maDs      = [...ma, ...Array(fLabels.length).fill(null)];
+    const chart = new Chart(cvEl, {
+      type: 'line',
+      data: {
+        labels: allLabels,
+        datasets: [
+          { label: 'Real',       data: realDs,  borderColor: color,     backgroundColor: color + '18', fill: false, tension: 0.3, borderWidth: 2, pointRadius: allLabels.length > 60 ? 0 : 2 },
+          { label: 'Tendencia',  data: trendDs, borderColor: '#ffa502', borderDash: [6,4],  pointRadius: 0, borderWidth: 1.5, fill: false },
+          { label: 'Pronóstico', data: foreDs,  borderColor: '#ff4757', borderDash: [4,3],  pointRadius: 3, borderWidth: 1.5, fill: false },
+          { label: 'Media móvil',data: maDs,    borderColor: '#a29bfe', pointRadius: 0,     borderWidth: 1.5, fill: false, tension: 0.5 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { labels: { font: { size: 9 }, boxWidth: 12 } } },
+        scales: {
+          x: { ticks: { font: { size: 9 }, maxTicksLimit: 8 }, grid: { display: false } },
+          y: { ticks: { font: { size: 9 } }, grid: { color: 'rgba(0,0,0,.05)' } },
+        },
+      },
+    });
+    _dashCharts[w.id] = chart;
+    const bdEl = document.getElementById('pred-bd-' + w.id);
+    if (bdEl) {
+      const dir  = ri.direction === 'subiendo' ? 'up' : 'down';
+      const dirArrow = ri.direction === 'subiendo' ? '↑' : '↓';
+      const slh  = Math.abs(ri.slope_per_hour || 0).toFixed(3);
+      bdEl.innerHTML = `<span class="pred-badge">R² ${(ri.r2 || 0).toFixed(3)}</span>`
+        + `<span class="pred-badge ${dir}">${dirArrow} ${ri.direction} ${slh}/h</span>`
+        + (anom.total ? `<span class="pred-badge warn">⚠ ${anom.total} anomalías (${anom.pct}%)</span>` : '');
+    }
+    return;
+  }
+
   if (tipo === 'kpi') {
     const last  = data.stats?.last ?? (values.length ? values[values.length-1] : '—');
     const avg   = data.stats?.avg  ?? null;
@@ -3660,6 +3786,77 @@ function closeWidgetModal() {
   _editingWidgetId = null;
 }
 
+function drawBoxplot(canvas, stats) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.offsetWidth  || canvas.width  || 100;
+  const h = canvas.offsetHeight || canvas.height || 200;
+  canvas.width  = w;
+  canvas.height = h;
+  const pad = 28;
+  const range = stats.max - stats.min || 1;
+  const scale = (h - 2 * pad) / range;
+  const toY = v => h - pad - (v - stats.min) * scale;
+  const cx = w / 2;
+  const bw = w * 0.36;
+  ctx.clearRect(0, 0, w, h);
+
+  // Caja Q1-Q3
+  ctx.fillStyle = 'rgba(0,212,170,0.18)';
+  ctx.strokeStyle = '#00d4aa';
+  ctx.lineWidth = 2;
+  const boxTop = toY(stats.q3);
+  const boxH   = toY(stats.q1) - toY(stats.q3);
+  ctx.fillRect(cx - bw/2, boxTop, bw, boxH);
+  ctx.strokeRect(cx - bw/2, boxTop, bw, boxH);
+
+  // Mediana
+  ctx.beginPath();
+  ctx.moveTo(cx - bw/2, toY(stats.median));
+  ctx.lineTo(cx + bw/2, toY(stats.median));
+  ctx.strokeStyle = '#ffa502';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Bigotes
+  ctx.strokeStyle = '#00d4aa';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, toY(stats.q1)); ctx.lineTo(cx, toY(stats.min));
+  ctx.moveTo(cx, toY(stats.q3)); ctx.lineTo(cx, toY(stats.max));
+  ctx.stroke();
+
+  // Caps
+  [stats.min, stats.max].forEach(v => {
+    ctx.beginPath();
+    ctx.moveTo(cx - bw/4, toY(v));
+    ctx.lineTo(cx + bw/4, toY(v));
+    ctx.stroke();
+  });
+
+  // Outliers
+  ctx.fillStyle = '#ff4757';
+  (stats.outliers || []).forEach(v => {
+    ctx.beginPath();
+    ctx.arc(cx, toY(v), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Media (×)
+  ctx.fillStyle = '#00d4aa';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('×', cx, toY(stats.mean));
+
+  // Etiquetas
+  ctx.font = '9px sans-serif';
+  ctx.fillStyle = 'rgba(200,200,200,.7)';
+  ctx.textBaseline = 'middle';
+  [[stats.max, -10], [stats.median, 0], [stats.min, 10]].forEach(([v, off]) => {
+    ctx.fillText(v.toFixed(1), cx + bw/2 + 3, toY(v) + off);
+  });
+}
+
 function selectTipo(tipo, btn) {
   _wmTipo = tipo;
   document.querySelectorAll('.wm-tipo-btn:not([style*="background"])').forEach(b => b.classList.remove('selected'));
@@ -3794,6 +3991,47 @@ async function buildWmPreview() {
         <thead><tr>${labels.map(l => `<th>${esc(String(l))}</th>`).join('')}</tr></thead>
         <tbody><tr>${values.map(v => `<td>${v}</td>`).join('')}</tr></tbody>
       </table></div>`;
+    return;
+  }
+  if (_wmTipo === 'boxplot') {
+    const sampleBp = { min:1050,q1:1200,median:1350,q3:1450,max:1580,mean:1340,std:120,outliers:[980,1650],n:values.length };
+    box.innerHTML = '<canvas id="wm-bp-prev" style="height:130px;width:90px"></canvas>';
+    const cvp = document.getElementById('wm-bp-prev');
+    if (cvp) drawBoxplot(cvp, sampleBp);
+    return;
+  }
+  if (_wmTipo === 'statistics') {
+    box.innerHTML = `<div class="stats-widget" style="font-size:10px">
+      <div class="stats-table">
+        <div class="stat-row"><span>Media</span><span>1,300</span></div>
+        <div class="stat-row"><span>Mediana</span><span>1,350</span></div>
+        <div class="stat-row"><span>Desv. Est.</span><span>120</span></div>
+        <div class="stat-row"><span>Mín</span><span>1,050</span></div>
+        <div class="stat-row"><span>Máx</span><span>1,580</span></div>
+        <div class="stat-row"><span>N</span><span>${values.length}</span></div>
+      </div></div>`;
+    return;
+  }
+  if (_wmTipo === 'prediction') {
+    const trend = values.map((v,i) => v * (1 + i*0.01));
+    const fore  = [1370,1390,1410,1430];
+    box.innerHTML = '<canvas id="wm-pred-prev"></canvas>';
+    const cvp = document.getElementById('wm-pred-prev');
+    if (!cvp) return;
+    _wmPreviewChart = new Chart(cvp, {
+      type: 'line',
+      data: {
+        labels: [...labels, '+5m','+10m','+15m','+20m'],
+        datasets: [
+          { label:'Real',       data:[...values,...Array(4).fill(null)], borderColor:'#00d4aa', fill:false, tension:0.3, borderWidth:2, pointRadius:2 },
+          { label:'Tendencia',  data:[...trend,...Array(4).fill(null)],  borderColor:'#ffa502', borderDash:[5,4], pointRadius:0, fill:false },
+          { label:'Pronóstico', data:[...Array(values.length).fill(null),...fore], borderColor:'#ff4757', borderDash:[3,3], pointRadius:3, fill:false },
+        ],
+      },
+      options: { responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{legend:{labels:{font:{size:8},boxWidth:10}}},
+        scales:{ x:{ticks:{font:{size:8},maxTicksLimit:5}}, y:{ticks:{font:{size:8}}} } },
+    });
     return;
   }
   const canvas = document.createElement('canvas');

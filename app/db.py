@@ -1002,6 +1002,45 @@ def query_celda3105_ciclos_historial(limit: int = 10) -> list[dict]:
         return _demo_celda3105_ciclos_historial()
 
 
+def _query_widget_influx_with_ts(measurement: str, field: str,
+                                  machine_id: str | None, range_str: str,
+                                  aggregation: str, window: str) -> list[dict]:
+    """Igual que _query_widget_influx pero incluye 'ts' como epoch segundos."""
+    client = _influx_client()
+    if client is None:
+        return []
+    machine_filter = (f'|> filter(fn: (r) => r.machine_id == "{machine_id}")'
+                      if machine_id else "")
+    flux = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: {range_str})
+      |> filter(fn: (r) => r._measurement == "{measurement}")
+      {machine_filter}
+      |> filter(fn: (r) => r._field == "{field}")
+      |> aggregateWindow(every: {window}, fn: {aggregation}, createEmpty: false)
+      |> sort(columns: ["_time"], desc: false)
+    """
+    try:
+        tables = client.query_api().query(flux)
+        results = []
+        for table in tables:
+            for record in table.records:
+                val = record.get_value()
+                t   = record.get_time()
+                results.append({
+                    'ts':    t.timestamp(),
+                    'label': t.strftime('%H:%M'),
+                    'value': round(float(val), 3) if val is not None else 0.0,
+                })
+        client.close()
+        return results
+    except Exception as exc:
+        log.warning("_query_widget_influx_with_ts: %s", exc)
+        try: client.close()
+        except Exception: pass
+        return []
+
+
 def _query_widget_influx(measurement: str, field: str,
                          machine_id: str | None, range_str: str,
                          aggregation: str, window: str) -> list[dict]:

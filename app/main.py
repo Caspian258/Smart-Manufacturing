@@ -76,9 +76,11 @@ from db import (
     get_widget as _db_get_widget,
     update_widget_positions as _db_update_widget_positions,
     _query_widget_influx,
+    _query_widget_influx_with_ts,
 )
 from health_check import HealthChecker
 from plc_manager import PLCManager
+import analytics as _analytics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -890,20 +892,72 @@ class Api:
 
         if fuente == "influxdb":
             from config import ENERGY_MEASUREMENT as _EM
-            result = _query_widget_influx(
-                fuente_config.get("measurement", _EM),
-                fuente_config.get("field", "power_w"),
-                fuente_config.get("machine_id"),
-                fuente_config.get("range", "-1h"),
-                fuente_config.get("aggregation", "mean"),
-                fuente_config.get("window", "5m"),
-            )
+            _m   = fuente_config.get("measurement", _EM)
+            _f   = fuente_config.get("field", "power_w")
+            _mid = fuente_config.get("machine_id")
+            _rng = fuente_config.get("range", "-1h")
+            _agg = fuente_config.get("aggregation", "mean")
+            _win = fuente_config.get("window", "5m")
+            tipo = widget.get("tipo", "line")
+
+            # ── tipos analíticos — necesitan epoch timestamps ──────────────
+            if tipo in ("boxplot", "prediction", "statistics"):
+                ts_data = _query_widget_influx_with_ts(_m, _f, _mid, _rng, _agg, _win)
+                if not ts_data:
+                    return {"labels": [], "datasets": [], "stats": {}}
+                timestamps = [d["ts"]    for d in ts_data]
+                labels     = [d["label"] for d in ts_data]
+                values     = [d["value"] for d in ts_data]
+
+                if tipo == "boxplot":
+                    bp = _analytics.compute_boxplot(values)
+                    return {"type": "boxplot",
+                            "stats": bp,
+                            "labels": [_f]}
+
+                if tipo == "statistics":
+                    return {"type": "statistics",
+                            "stats":   _analytics.compute_statistics(values),
+                            "boxplot": _analytics.compute_boxplot(values)}
+
+                if tipo == "prediction":
+                    reg = _analytics.compute_linear_regression(
+                        timestamps, values,
+                        forecast_points=int(fuente_config.get("forecast_points", 12)),
+                    )
+                    anom = _analytics.detect_anomalies(values)
+                    ma   = _analytics.compute_moving_average(values, window=5)
+                    forecast_labels = []
+                    if reg:
+                        import datetime as _datetime
+                        for fts in reg["forecast_timestamps"]:
+                            forecast_labels.append(
+                                _datetime.datetime.fromtimestamp(fts).strftime("%H:%M")
+                            )
+                    return {
+                        "type":           "prediction",
+                        "labels":         labels,
+                        "values":         values,
+                        "trend_line":     reg["trend_line"]     if reg else [],
+                        "forecast_values":reg["forecast_values"] if reg else [],
+                        "forecast_labels":forecast_labels,
+                        "moving_average": ma,
+                        "anomalies":      anom,
+                        "regression_info": {
+                            "r2":            reg["r2"]            if reg else 0,
+                            "direction":     reg["direction"]     if reg else "",
+                            "slope_per_hour":reg["slope_per_hour"] if reg else 0,
+                        } if reg else {},
+                    }
+
+            # ── tipos estándar (line, area, bar, pie, kpi, table) ─────────
+            result = _query_widget_influx(_m, _f, _mid, _rng, _agg, _win)
             if not result:
                 return {"labels": [], "datasets": [], "stats": {}}
             labels = [d["time"] for d in result]
             values = [d["value"] for d in result]
             return {"labels": labels,
-                    "datasets": [{"label": fuente_config.get("field", ""), "data": values}],
+                    "datasets": [{"label": _f, "data": values}],
                     "stats": {"min":  round(min(values), 2) if values else 0,
                               "max":  round(max(values), 2) if values else 0,
                               "avg":  round(sum(values) / len(values), 2) if values else 0,

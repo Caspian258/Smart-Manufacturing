@@ -2,6 +2,23 @@
 # Orquestador: Claude Code
 # ═══════════════════════════════════════════════════════════════════════
 
+## ENTRADA #088 — Módulo 4 — Análisis Estadístico y Predicciones
+- **Fecha**: 2026-06-09
+- **Implementado**:
+  - `app/analytics.py` — módulo nuevo: `compute_boxplot`, `compute_moving_average`, `compute_linear_regression` (scikit-learn LinearRegression + forecast), `detect_anomalies` (z-score / IQR), `compute_statistics`
+  - `app/db.py` — `_query_widget_influx_with_ts()`: variante de la consulta InfluxDB que devuelve `ts` (epoch) para regresión
+  - `app/main.py` — `get_widget_data()` extendido: tipos `boxplot`, `statistics`, `prediction` usan la nueva ruta con timestamps; tipos estándar sin cambio
+  - `app/templates/index.html`:
+    - Paso 1 del modal: sección "Análisis" con botones Bigotes, Predicción, Estadísticas
+    - CSS: `.stats-widget`, `.stat-row`, `.mini-boxplot-wrap`, `.pred-badges`, `.pred-badge`
+    - `drawBoxplot(canvas, stats)` — canvas nativo: caja Q1-Q3, mediana naranja, bigotes, outliers rojos, media (×)
+    - `_renderWidgetInEl` — casos `boxplot`, `statistics`, `prediction`
+    - `buildWmPreview` — previews de muestra para los 3 tipos nuevos
+  - Dependencies instaladas en venv: `scipy 1.17.1`, `scikit-learn 1.9.0` (numpy ya existía)
+- **Estado**: ✅ Implementado
+
+---
+
 ## ENTRADA #087 — Login 3 factores + Autodestrucción
 - **Fecha**: 2026-06-08
 - **Implementado**:
